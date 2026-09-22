@@ -2,8 +2,8 @@
 
 Client SDKs for the XI Parallax REST API (`https://api.parallax.xiobjects.com`), in .NET
 (`Xio.Parallax.Client`, .NET 10) and Python (`xio-parallax-client`, Python 3.11+). Both are
-generated from the API's OpenAPI document, pinned at `openapi/v1.json` and refreshed by CI from
-the live document. On top of the generated code each package carries a hand-written layer for
+generated from the API's OpenAPI document, pinned at `openapi/v1.json` and refreshed by hand from
+the live document when the contract changes. On top of the generated code each package carries a hand-written layer for
 the three things a generator cannot give:
 
 - the multipart request with `manifest[<kind>]` parts, which the document can only describe;
@@ -106,6 +106,14 @@ uv sync --frozen && uv run ruff check python examples/python && uv run pytest
 ```
 
 `scripts/generate.sh` regenerates both clients from `openapi/v1.json` (Kiota at the version
-`kiota-lock.json` names, openapi-python-client through `uvx`); CI fails when the committed
-generated code differs from what the pin produces, and the daily `regenerate` workflow opens a
-pull request when the live document changes. `clients-initial-build.md` is the design of record.
+`kiota-lock.json` names, openapi-python-client through `uvx`). When the API's contract changes,
+fetch the live document over the pin and regenerate:
+
+```
+curl -fsS -o openapi/v1.json https://api.parallax.xiobjects.com/openapi/v1.json
+sh scripts/generate.sh
+```
+
+`scripts/openapi-changed.py` tells whether two documents are the same contract, ignoring the
+build commit in `info.version`. There is no CI: nothing is shipped. `clients-initial-build.md`
+is the design of record.
