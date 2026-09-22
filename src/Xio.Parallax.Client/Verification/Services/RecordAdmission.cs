@@ -18,7 +18,7 @@ internal sealed class RecordAdmission(IVerificationEncoding _encoding) : IRecord
             throw new VerificationRefusedException($"Canonical version {verification.CanonicalVersion?.ToString() ?? VerificationConstants.AbsentValue} is not implemented; only {VerificationConstants.ImplementedCanonicalVersion} is.");
         }
 
-        if (!string.Equals(verification.HashAlgorithm, VerificationConstants.ImplementedHashAlgorithm, StringComparison.Ordinal))
+        if (!string.Equals(verification.HashAlgorithm, VerificationConstants.ImplementedHashAlgorithm, StringComparison.OrdinalIgnoreCase))
         {
             throw new VerificationRefusedException($"Hash algorithm '{verification.HashAlgorithm ?? VerificationConstants.AbsentValue}' is not implemented; only {VerificationConstants.ImplementedHashAlgorithm} is.");
         }

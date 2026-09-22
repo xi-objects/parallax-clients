@@ -45,15 +45,16 @@ internal static class SignedRecordFactory
 
         return new PublishedRecordResponse
         {
-            OriginalImageHash = Convert.ToHexStringLower(SHA256.HashData(ImageBytes)),
+            OriginalImageHash = Convert.ToHexStringLower(contentHash),
             Outcome = PublishedRecordOutcome.Published,
             Manifests = [c2pa, xi],
             Verification = new PublishedRecordVerification
             {
                 CanonicalVersion = 2,
                 ContentHash = Convert.ToHexStringLower(contentHash),
-                HashAlgorithm = "BLAKE3-256",
-                SignatureAlgorithm = "Ed25519",
+                // The literals the harness emits (Xio.Parallax.Harness OrbitalRecordModels): lower-case.
+                HashAlgorithm = "blake3-256",
+                SignatureAlgorithm = "ed25519",
                 SignedAtUtc = SignedAt,
                 PublicKey = ToBase64Url(pki.LeafPublicKey),
                 Signature = Sign(key, Preimages.Image(contentHash)),

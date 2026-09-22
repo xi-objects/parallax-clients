@@ -3,6 +3,7 @@ one look-up slot conversation. Re-running the same command after an interruption
 client re-declares every hash and uploads only what the slot does not already hold.
 
 Environment:
+  PARALLAX_BASE_URL           the API's base URL (defaults to https://api.parallax.xiobjects.com)
   PARALLAX_TOKEN              the account token (required)
   PARALLAX_IMAGES             a folder of images (required)
   PARALLAX_IMAGE_TYPE         their media type, for example image/jpeg (required)
@@ -49,6 +50,7 @@ def main() -> None:
 
     client = ParallaxClient(
         ParallaxClientOptions(
+            base_url=os.environ.get("PARALLAX_BASE_URL") or ParallaxClientOptions().base_url,
             account_token=required("PARALLAX_TOKEN"),
             batching=UploadBatching(
                 max_request_bytes=int(required("PARALLAX_MAX_REQUEST_BYTES")),

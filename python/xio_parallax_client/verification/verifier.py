@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import binascii
 import datetime
-import hashlib
 from typing import Any
 
 import blake3
@@ -144,28 +143,22 @@ class AttributionVerifier:
     def _original_hashes(
         record: NormalizedRecord, content_hash: bytes, original: bytes | None
     ) -> list[VerificationCheck]:
+        """`originalImageHash` is the record's own key (`= verification.contentHash`, checked either way);
+        `contentHash` recomputes BLAKE3-256 over the supplied original and is NOT_PERFORMED without it."""
+        content_hash_hex = content_hash.hex()
+        keyed_ok = record.original_image_hash.lower() == content_hash_hex
+        detail = (
+            "originalImageHash equals verification.contentHash"
+            if keyed_ok
+            else f"originalImageHash is {record.original_image_hash!r}, contentHash is {content_hash_hex!r}"
+        )
+        original_check = VerificationCheck("originalImageHash", _PASSED if keyed_ok else _FAILED, detail)
         if original is None:
-            detail = "original image bytes not supplied"
-            return [
-                VerificationCheck("originalImageHash", CheckOutcome.NOT_PERFORMED, detail),
-                VerificationCheck("contentHash", CheckOutcome.NOT_PERFORMED, detail),
-            ]
-        sha = hashlib.sha256(original).hexdigest()
-        sha_ok = sha == record.original_image_hash.lower()
-        b3 = blake3.blake3(original).digest()
-        b3_ok = b3 == content_hash
-        return [
-            VerificationCheck(
-                "originalImageHash",
-                _PASSED if sha_ok else _FAILED,
-                "SHA-256 of the original matches" if sha_ok else f"SHA-256 of the original is {sha}",
-            ),
-            VerificationCheck(
-                "contentHash",
-                _PASSED if b3_ok else _FAILED,
-                "BLAKE3-256 of the original matches" if b3_ok else f"BLAKE3-256 of the original is {b3.hex()}",
-            ),
-        ]
+            not_performed = VerificationCheck("contentHash", CheckOutcome.NOT_PERFORMED, "original image bytes not supplied")
+            return [original_check, not_performed]
+        b3_ok = blake3.blake3(original).digest() == content_hash
+        b3_detail = "BLAKE3-256 of the original matches" if b3_ok else "BLAKE3-256 of the original differs"
+        return [original_check, VerificationCheck("contentHash", _PASSED if b3_ok else _FAILED, b3_detail)]
 
     @staticmethod
     def _public_key(text: str) -> tuple[Ed25519PublicKey | None, bytes | None]:

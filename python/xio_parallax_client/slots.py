@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 from . import hashing
 from .generated.models.lookup_results_response import LookupResultsResponse
+from .generated.models.published_record_outcome import PublishedRecordOutcome
 from .generated.models.slot_commit_response import SlotCommitResponse
 from .generated.models.slot_progress_response import SlotProgressResponse
 from .generated.models.slot_upload_outcome_response import SlotUploadOutcomeResponse
@@ -66,6 +67,18 @@ class LookupBatchResult:
     lookup_slot_id: str
     results: LookupResultsResponse
     final_progress: SlotProgressResponse
+
+
+@dataclass(frozen=True, slots=True)
+class RecordWaitOptions:
+    """Options for `wait_for_record`; both fields are required, mirroring `RegisterBatchOptions`.
+
+    A record is published some seconds after registration, so there is no default backoff or
+    deadline the client should guess.
+    """
+
+    poll_interval: float
+    poll_timeout: float
 
 
 def hash_registration_items(items: Sequence[RegistrationItem]) -> dict[str, RegistrationItem]:
@@ -128,6 +141,11 @@ def plan_lookup_batches(
 def is_progress_terminal(progress: SlotProgressResponse) -> bool:
     """Return `True` once no entry in `progress` is still `retry` (the engine has answered all of them)."""
     return all(entry.state != "retry" for entry in progress.entries)
+
+
+def is_record_outcome_terminal(outcome: PublishedRecordOutcome) -> bool:
+    """Return `True` for `published`, `takenDown` or `refused`; `False` for `noRecordAnswered`/`retry`."""
+    return outcome not in (PublishedRecordOutcome.NORECORDANSWERED, PublishedRecordOutcome.RETRY)
 
 
 def next_poll_delay(current: float, cap: float) -> float:

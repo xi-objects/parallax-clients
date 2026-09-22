@@ -7,6 +7,9 @@
     <ProjectReference Include="../../src/Xio.Parallax.Client/Xio.Parallax.Client.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="../../fixtures/record/*" LinkBase="fixtures/record" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">

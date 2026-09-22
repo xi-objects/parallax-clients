@@ -30,7 +30,10 @@ using var client = new ParallaxClient(new ParallaxClientOptions
 var registered = await client.RegisterAsync(ImageUpload.FromFile("photo.png", "image/png"),
                                             [new ManifestPart("c2pa", ManifestForm.C2pa, c2paBytes)]);
 var found = await client.LookupAsync(ImageUpload.FromFile("photo.png", "image/png"));
-var record = await client.GetRecordAsync(registered.ImageHash!);
+// Publication follows registration by some seconds; wait it out rather than a single look-up.
+// The record store is keyed by the engine's own hash, OriginalImageHash, not REST's ImageHash.
+var record = await client.WaitForRecordAsync(
+    registered.OriginalImageHash!, new RecordWaitOptions(TimeSpan.FromSeconds(2), TimeSpan.FromMinutes(2)));
 await client.UnregisterAsync(registered.Id!.Value);
 
 // A whole folder in one slot conversation; run it again after an interruption to resume.
@@ -51,8 +54,8 @@ the document, so a batch call refuses without `Batching` rather than guessing.
 
 ```python
 from xio_parallax_client import (ImageUpload, ManifestForm, ManifestPart, ParallaxClient,
-                                 ParallaxClientOptions, RegisterBatchOptions, RegistrationItem,
-                                 UploadBatching)
+                                 ParallaxClientOptions, RecordWaitOptions, RegisterBatchOptions,
+                                 RegistrationItem, UploadBatching)
 from xio_parallax_client.verification import AttributionVerifier, TrustRoots
 
 client = ParallaxClient(ParallaxClientOptions(account_token=token,
@@ -61,7 +64,9 @@ client = ParallaxClient(ParallaxClientOptions(account_token=token,
 registered = client.register(ImageUpload.from_file("photo.png", "image/png"),
                              [ManifestPart("c2pa", ManifestForm.C2PA, c2pa_bytes)])
 found = client.lookup(ImageUpload.from_file("photo.png", "image/png"))
-record = client.get_record(registered.image_hash)
+# Publication follows registration by some seconds; wait_for_record polls until it lands.
+record = client.wait_for_record(registered.original_image_hash,
+                                RecordWaitOptions(poll_interval=2.0, poll_timeout=120.0))
 client.unregister(str(registered.id))
 
 result = client.register_batch([RegistrationItem(image) for image in images],
@@ -74,12 +79,15 @@ report = AttributionVerifier(TrustRoots.from_orbital(orbital_url)).verify(record
 
 ## The verifier
 
-`verify` returns a report with one outcome per check, never a bare boolean: `originalImageHash`,
-`contentHash`, `manifestHash:<kind>`, `manifestSignature:<kind>`, `collectionSignature`,
-`imageSignature`, `leafKeyMatchesPublicKey`, `certificateChain`. A JSON-form manifest's hash is
-reported as not recomputable, never as passed; an unknown hash algorithm, canonical version or
-an empty root list is a refusal, never a skipped check. The roots come from Orbital's anonymous
-`GET /info` (`pinnedRoots`), fetched once over TLS and pinned, or from a PEM file.
+`verify` returns a report with one outcome per check, never a bare boolean: `originalImageHash`
+(the record is keyed by its own content hash in hex), `contentHash` (BLAKE3-256 over the original
+bytes, when you have them), `manifestHash:<kind>`, `manifestSignature:<kind>`,
+`collectionSignature`, `imageSignature`, `leafKeyMatchesPublicKey`, `certificateChain`. A
+JSON-form manifest's hash is reported as not recomputable, never as passed; an unknown hash
+algorithm, canonical version or an empty root list is a refusal, never a skipped check. The roots
+come from Orbital's anonymous `GET /info` (`pinnedRoots`), fetched once over TLS and pinned, or
+from a PEM file. Both verifiers carry a conformance test over a real record captured from the
+API's own e2e stack (`fixtures/record/`), and every performed check passes on it.
 
 ## Examples
 

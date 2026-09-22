@@ -6,13 +6,16 @@ passed in explicitly, which is what lets `client.py` and `async_client.py` share
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import asyncio
+import time
+from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
 
 from . import problems
 from .generated.client import AuthenticatedClient
-from .generated.models import SlotProgressResponse
+from .generated.models import PublishedRecordOutcome, PublishedRecordResponse, SlotProgressResponse
 from .options import ParallaxClientOptions
+from .slots import RecordWaitOptions, is_record_outcome_terminal, next_poll_delay
 
 ProgressCallback = Callable[[SlotProgressResponse], None]
 
@@ -42,3 +45,55 @@ def _require_batching(options: ParallaxClientOptions, call_name: str) -> Any:
             "max_images_per_request); the server's caps are operator configuration and are never guessed."
         )
     return options.batching
+
+
+def _record_wait_timeout(
+    original_image_hash: str, elapsed: float, options: RecordWaitOptions, outcome: PublishedRecordOutcome
+) -> problems.ParallaxClientError:
+    """Build the `ParallaxClientError` `wait_for_record` raises on timeout, naming the hash and last outcome."""
+    return problems.ParallaxClientError(
+        f"waiting for the record of {original_image_hash!r} timed out after {elapsed:.3f}s "
+        f"(poll_timeout={options.poll_timeout}s); last outcome was '{outcome}'"
+    )
+
+
+def _poll_for_record(
+    get_record: Callable[[str], PublishedRecordResponse], original_image_hash: str, options: RecordWaitOptions
+) -> PublishedRecordResponse:
+    """Shared body of `ParallaxClient.wait_for_record`: poll `get_record` until the outcome is terminal.
+
+    `noRecordAnswered`/`retry` are retried with the same bounded exponential backoff
+    `register_batch`/`lookup_batch` poll with; raises once `options.poll_timeout` elapses.
+    """
+    delay = options.poll_interval
+    elapsed = 0.0
+    while True:
+        record = get_record(original_image_hash)
+        if is_record_outcome_terminal(record.outcome):
+            return record
+        if elapsed >= options.poll_timeout:
+            raise _record_wait_timeout(original_image_hash, elapsed, options, record.outcome)
+        wait = min(delay, options.poll_timeout - elapsed)
+        time.sleep(wait)
+        elapsed += wait
+        delay = next_poll_delay(delay, options.poll_timeout)
+
+
+async def _poll_for_record_async(
+    get_record: Callable[[str], Awaitable[PublishedRecordResponse]],
+    original_image_hash: str,
+    options: RecordWaitOptions,
+) -> PublishedRecordResponse:
+    """Async mirror of `_poll_for_record`, the shared body of `AsyncParallaxClient.wait_for_record`."""
+    delay = options.poll_interval
+    elapsed = 0.0
+    while True:
+        record = await get_record(original_image_hash)
+        if is_record_outcome_terminal(record.outcome):
+            return record
+        if elapsed >= options.poll_timeout:
+            raise _record_wait_timeout(original_image_hash, elapsed, options, record.outcome)
+        wait = min(delay, options.poll_timeout - elapsed)
+        await asyncio.sleep(wait)
+        elapsed += wait
+        delay = next_poll_delay(delay, options.poll_timeout)

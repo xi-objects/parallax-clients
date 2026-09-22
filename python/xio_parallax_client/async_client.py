@@ -16,7 +16,7 @@ import httpx
 
 from . import multipart, problems
 from . import slots as slots_module
-from ._calls import ProgressCallback, _build_api, _parsed, _require_batching
+from ._calls import ProgressCallback, _build_api, _parsed, _poll_for_record_async, _require_batching
 from .generated.api.lookup import (
     get_lookup_slots_lookup_slot_id_progress,
     get_lookup_slots_lookup_slot_id_results,
@@ -51,6 +51,7 @@ from .options import ParallaxClientOptions
 from .slots import (
     LookupBatchOptions,
     LookupBatchResult,
+    RecordWaitOptions,
     RegisterBatchOptions,
     RegisterBatchResult,
     RegistrationItem,
@@ -93,6 +94,10 @@ class AsyncParallaxClient:
         )
         problems.raise_for_problem(response)
         return _parsed(response)
+
+    async def wait_for_record(self, original_image_hash: str, options: RecordWaitOptions) -> PublishedRecordResponse:
+        """Poll `get_record` until its outcome is terminal; raise once `options.poll_timeout` elapses."""
+        return await _poll_for_record_async(self.get_record, original_image_hash, options)
 
     async def get_records(self, hashes: Sequence[str]) -> PublishedRecordsResponse:
         """Recover the published records for several original image hashes (`POST /records`)."""

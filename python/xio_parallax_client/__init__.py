@@ -14,6 +14,7 @@ from .problems import ParallaxClientError, ParallaxProblem
 from .slots import (
     LookupBatchOptions,
     LookupBatchResult,
+    RecordWaitOptions,
     RegisterBatchOptions,
     RegisterBatchResult,
     RegistrationItem,
@@ -30,6 +31,7 @@ __all__ = [
     "ParallaxClientError",
     "ParallaxClientOptions",
     "ParallaxProblem",
+    "RecordWaitOptions",
     "RegisterBatchOptions",
     "RegisterBatchResult",
     "RegistrationItem",

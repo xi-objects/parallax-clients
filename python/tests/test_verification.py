@@ -5,7 +5,6 @@ from __future__ import annotations
 import base64
 import copy
 import datetime as dt
-import hashlib
 import json
 import struct
 from dataclasses import dataclass
@@ -60,6 +59,68 @@ def _ca(cn: str) -> tuple[x509.Certificate, ed25519.Ed25519PrivateKey]:
     return cert, key
 
 
+def _intermediate_ca(
+    cn: str, issuer_cert: x509.Certificate, issuer_key: ed25519.Ed25519PrivateKey, path_length: int | None = 0
+) -> tuple[x509.Certificate, ed25519.Ed25519PrivateKey]:
+    """A CA certificate signed by another CA, for certificate-chain shape tests."""
+    key = ed25519.Ed25519PrivateKey.generate()
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(_name(cn))
+        .issuer_name(issuer_cert.subject)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(SIGNED_AT - dt.timedelta(days=365))
+        .not_valid_after(SIGNED_AT + dt.timedelta(days=3650))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=path_length), critical=True)
+        .add_extension(x509.KeyUsage(False, False, False, False, False, True, True, False, False), critical=True)
+        .sign(issuer_key, None)
+    )
+    return cert, key
+
+
+def _leaf_for(
+    issuer_cert: x509.Certificate, issuer_key: ed25519.Ed25519PrivateKey
+) -> tuple[x509.Certificate, ed25519.Ed25519PrivateKey]:
+    """A non-CA leaf certificate issued by the given CA, for certificate-chain shape tests."""
+    signer = ed25519.Ed25519PrivateKey.generate()
+    leaf = (
+        x509.CertificateBuilder()
+        .subject_name(_name("parallax signing service"))
+        .issuer_name(issuer_cert.subject)
+        .public_key(signer.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(SIGNED_AT - dt.timedelta(days=30))
+        .not_valid_after(SIGNED_AT + dt.timedelta(days=30))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .sign(issuer_key, None)
+    )
+    return leaf, signer
+
+
+def _chain_record(
+    leaf: x509.Certificate, signer: ed25519.Ed25519PrivateKey, chain: list[x509.Certificate]
+) -> dict[str, Any]:
+    """A minimal record carrying just what the `certificateChain` check needs."""
+    content_hash = blake3.blake3(ORIGINAL).digest()
+    public_raw = signer.public_key().public_bytes_raw()
+    return {
+        "originalImageHash": content_hash.hex(),
+        "manifests": [],
+        "verification": {
+            "contentHash": content_hash.hex(),
+            "hashAlgorithm": "blake3-256",
+            "signedAtUtc": SIGNED_AT.isoformat().replace("+00:00", "Z"),
+            "signature": _sign(signer, content_hash),
+            "signatureAlgorithm": "ed25519",
+            "publicKey": base64.urlsafe_b64encode(public_raw).decode("ascii").rstrip("="),
+            "leafCertificate": _pem(leaf),
+            "certificateChain": [_pem(c) for c in chain],
+            "canonicalVersion": 2,
+        },
+    }
+
+
 @dataclass
 class Fixture:
     """A signed record with the root that anchors it and the key that signed it."""
@@ -93,7 +154,7 @@ def _build() -> Fixture:
     entries = [("c2pa", c2pa_hash), ("xi-manifest", xi_hash)]
     public_raw = signer.public_key().public_bytes_raw()
     record = {
-        "originalImageHash": hashlib.sha256(ORIGINAL).hexdigest(),
+        "originalImageHash": content_hash.hex(),
         "outcome": "published",
         "manifests": [
             {
@@ -112,10 +173,10 @@ def _build() -> Fixture:
         ],
         "verification": {
             "contentHash": content_hash.hex(),
-            "hashAlgorithm": "BLAKE3-256",
+            "hashAlgorithm": "blake3-256",  # the harness emits lower-case
             "signedAtUtc": SIGNED_AT.isoformat().replace("+00:00", "Z"),
             "signature": _sign(signer, content_hash),
-            "signatureAlgorithm": "Ed25519",
+            "signatureAlgorithm": "ed25519",
             "publicKey": base64.urlsafe_b64encode(public_raw).decode("ascii").rstrip("="),
             "leafCertificate": _pem(leaf),
             "certificateChain": [_pem(root)],
@@ -169,18 +230,30 @@ def test_json_form_manifest_hash_is_not_recomputable(fixture: Fixture) -> None:
     assert not report.passed("manifestHash:xi-manifest")
 
 
-def test_without_original_bytes_hash_recomputes_are_not_performed(fixture: Fixture) -> None:
+def test_without_original_bytes_only_content_hash_is_not_performed(fixture: Fixture) -> None:
     report = _verify(fixture, original=None)
     outcomes = {c.name: c.outcome for c in report.checks}
-    assert outcomes["originalImageHash"] is CheckOutcome.NOT_PERFORMED
+    assert outcomes["originalImageHash"] is CheckOutcome.PASSED
     assert outcomes["contentHash"] is CheckOutcome.NOT_PERFORMED
     assert report.all_performed_passed
 
 
-def test_wrong_original_bytes_fail_both_hashes(fixture: Fixture) -> None:
+def test_wrong_original_bytes_fail_content_hash_only(fixture: Fixture) -> None:
     report = _verify(fixture, original=ORIGINAL + b"x")
-    assert not report.passed("originalImageHash") and not report.passed("contentHash")
+    assert report.passed("originalImageHash")
+    assert not report.passed("contentHash")
     assert report.any_failed and not report.all_performed_passed
+
+
+def test_original_image_hash_mismatch_fails_regardless_of_bytes(fixture: Fixture) -> None:
+    record = copy.deepcopy(fixture.record)
+    record["originalImageHash"] = "0" * 64
+    with_bytes = _verify(fixture, record, original=ORIGINAL)
+    without_bytes = _verify(fixture, record, original=None)
+    assert with_bytes.outcome("originalImageHash") is CheckOutcome.FAILED
+    assert without_bytes.outcome("originalImageHash") is CheckOutcome.FAILED
+    # contentHash is unaffected: it recomputes over the original bytes, not the record's own key.
+    assert with_bytes.passed("contentHash")
 
 
 def _tampered_jumbf() -> bytes:
@@ -231,6 +304,55 @@ def test_wrong_root_fails_certificate_chain(fixture: Fixture) -> None:
     report = AttributionVerifier(TrustRoots.from_pem([_pem(other_root)])).verify(fixture.record, ORIGINAL)
     assert report.outcome("certificateChain") is CheckOutcome.FAILED
     assert report.passed("imageSignature")
+
+
+def test_chain_leaf_intermediate_root_passes_when_root_pinned() -> None:
+    root, root_key = _ca("Chain Root")
+    intermediate, intermediate_key = _intermediate_ca("Chain Intermediate", root, root_key)
+    leaf, signer = _leaf_for(intermediate, intermediate_key)
+    record = _chain_record(leaf, signer, [leaf, intermediate, root])
+    report = AttributionVerifier(TrustRoots.from_pem([_pem(root)])).verify(record)
+    assert report.passed("certificateChain")
+
+
+def test_chain_of_intermediate_only_passes() -> None:
+    root, root_key = _ca("Chain Root")
+    intermediate, intermediate_key = _intermediate_ca("Chain Intermediate", root, root_key)
+    leaf, signer = _leaf_for(intermediate, intermediate_key)
+    record = _chain_record(leaf, signer, [intermediate])
+    report = AttributionVerifier(TrustRoots.from_pem([_pem(root)])).verify(record)
+    assert report.passed("certificateChain")
+
+
+def test_chain_leaf_intermediate_without_root_passes() -> None:
+    root, root_key = _ca("Chain Root")
+    intermediate, intermediate_key = _intermediate_ca("Chain Intermediate", root, root_key)
+    leaf, signer = _leaf_for(intermediate, intermediate_key)
+    record = _chain_record(leaf, signer, [leaf, intermediate])
+    report = AttributionVerifier(TrustRoots.from_pem([_pem(root)])).verify(record)
+    assert report.passed("certificateChain")
+
+
+def test_chain_leaf_intermediate_root_fails_when_a_different_root_is_pinned() -> None:
+    root, root_key = _ca("Chain Root")
+    intermediate, intermediate_key = _intermediate_ca("Chain Intermediate", root, root_key)
+    leaf, signer = _leaf_for(intermediate, intermediate_key)
+    record = _chain_record(leaf, signer, [leaf, intermediate, root])
+    different_root, _ = _ca("Chain Different Root")
+    report = AttributionVerifier(TrustRoots.from_pem([_pem(different_root)])).verify(record)
+    assert report.outcome("certificateChain") is CheckOutcome.FAILED
+
+
+def test_chain_self_signed_terminal_root_fails_when_not_pinned() -> None:
+    other_root, other_root_key = _ca("Chain Untrusted Root")
+    intermediate, intermediate_key = _intermediate_ca("Chain Untrusted Intermediate", other_root, other_root_key)
+    leaf, signer = _leaf_for(intermediate, intermediate_key)
+    record = _chain_record(leaf, signer, [leaf, intermediate, other_root])
+    # A real, pinned root, unrelated to this chain: `other_root` is self-signed but must never be trusted
+    # merely because it looks like a root; only a pinned root by exact DER bytes/key can terminate the chain.
+    pinned_root, _ = _ca("Chain Root")
+    report = AttributionVerifier(TrustRoots.from_pem([_pem(pinned_root)])).verify(record)
+    assert report.outcome("certificateChain") is CheckOutcome.FAILED
 
 
 def test_leaf_outside_validity_at_signing_fails_chain(fixture: Fixture) -> None:

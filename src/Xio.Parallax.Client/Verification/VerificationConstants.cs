@@ -27,7 +27,7 @@ public static class VerificationConstants
     /// <summary>The Orbital discovery property that carries the pinned root PEMs (matched case-insensitively).</summary>
     public const string OrbitalPinnedRootsProperty = "pinnedRoots";
 
-    /// <summary>The name of the check of the original bytes' SHA-256 against <c>originalImageHash</c>.</summary>
+    /// <summary>The name of the check that the record's <c>originalImageHash</c> equals its own <c>contentHash</c>, case-insensitively and regardless of whether original bytes were supplied.</summary>
     public const string OriginalImageHashCheck = "originalImageHash";
 
     /// <summary>The name of the check of the original bytes' BLAKE3-256 against <c>contentHash</c>.</summary>

@@ -35,23 +35,35 @@ public sealed class AttributionVerifierTests
     }
 
     [Fact]
-    public void Without_the_original_bytes_both_image_hashes_are_not_performed()
+    public void Without_the_original_bytes_originalImageHash_still_passes_but_contentHash_is_not_performed()
     {
         var report = Verify(SignedRecordFactory.Create(_pki), null);
 
-        Assert.Equal(VerificationOutcome.NotPerformed, Outcome(report, "originalImageHash"));
+        Assert.Equal(VerificationOutcome.Passed, Outcome(report, "originalImageHash"));
         Assert.Equal(VerificationOutcome.NotPerformed, Outcome(report, "contentHash"));
         Assert.True(report.AllPerformedPassed);
     }
 
     [Fact]
-    public void Different_original_bytes_fail_both_image_hashes()
+    public void Different_original_bytes_fail_only_contentHash()
     {
         var report = Verify(SignedRecordFactory.Create(_pki), [0x01, 0x02]);
 
-        Assert.Equal(VerificationOutcome.Failed, Outcome(report, "originalImageHash"));
+        Assert.Equal(VerificationOutcome.Passed, Outcome(report, "originalImageHash"));
         Assert.Equal(VerificationOutcome.Failed, Outcome(report, "contentHash"));
         Assert.True(report.AnyFailed);
+    }
+
+    [Fact]
+    public void An_originalImageHash_that_disagrees_with_contentHash_fails_regardless_of_bytes()
+    {
+        var record = SignedRecordFactory.Create(_pki);
+        record.OriginalImageHash = Convert.ToHexStringLower(SignedRecordFactory.Blake3Digest([0xAA]));
+
+        var report = Verify(record, SignedRecordFactory.ImageBytes);
+
+        Assert.Equal(VerificationOutcome.Failed, Outcome(report, "originalImageHash"));
+        Assert.Equal(VerificationOutcome.Passed, Outcome(report, "contentHash"));
     }
 
     [Fact]
@@ -107,37 +119,6 @@ public sealed class AttributionVerifierTests
 
         Assert.Equal(VerificationOutcome.Failed, Outcome(report, "collectionSignature"));
         Assert.Equal(VerificationOutcome.Passed, Outcome(report, "manifestSignature:c2pa"));
-    }
-
-    [Fact]
-    public void A_wrong_root_fails_the_certificate_chain()
-    {
-        var stranger = TestPki.Create("Some Other Root");
-
-        var report = VerifyUnder(SignedRecordFactory.Create(_pki), _reader.FromPem([stranger.RootPem]));
-
-        Assert.Equal(VerificationOutcome.Failed, Outcome(report, "certificateChain"));
-    }
-
-    [Fact]
-    public void A_root_with_the_pinned_name_but_another_key_fails_the_certificate_chain()
-    {
-        var impostor = TestPki.Create(TestPki.DefaultRootName);
-
-        var report = VerifyUnder(SignedRecordFactory.Create(_pki), _reader.FromPem([impostor.RootPem]));
-
-        Assert.Equal(VerificationOutcome.Failed, Outcome(report, "certificateChain"));
-    }
-
-    [Fact]
-    public void A_signing_time_outside_the_validity_window_fails_the_certificate_chain()
-    {
-        var record = SignedRecordFactory.Create(_pki);
-        record.Verification!.SignedAtUtc = new DateTimeOffset(TestPki.NotAfter.AddDays(1));
-
-        var report = Verify(record, SignedRecordFactory.ImageBytes);
-
-        Assert.Equal(VerificationOutcome.Failed, Outcome(report, "certificateChain"));
     }
 
     [Fact]

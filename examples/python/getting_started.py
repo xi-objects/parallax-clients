@@ -2,6 +2,7 @@
 recover the record, verify it, take it down.
 
 Environment:
+  PARALLAX_BASE_URL       the API's base URL (defaults to https://api.parallax.xiobjects.com)
   PARALLAX_TOKEN          the account token that registers (required)
   PARALLAX_LOOKUP_TOKEN   a second account's token that looks the image up (defaults to PARALLAX_TOKEN)
   PARALLAX_IMAGE          path of the image to register (required)
@@ -25,6 +26,7 @@ from xio_parallax_client import (
     ParallaxClient,
     ParallaxClientOptions,
     ParallaxProblem,
+    RecordWaitOptions,
 )
 from xio_parallax_client.verification import AttributionVerifier, TrustRoots
 
@@ -58,8 +60,11 @@ def main() -> None:
         with open(manifest_path, "rb") as f:
             manifests.append(ManifestPart(kind="xi-manifest", form=ManifestForm.JSON, data=f.read()))
 
-    registrant = ParallaxClient(ParallaxClientOptions(account_token=token))
-    finder = ParallaxClient(ParallaxClientOptions(account_token=os.environ.get("PARALLAX_LOOKUP_TOKEN", token)))
+    base_url = os.environ.get("PARALLAX_BASE_URL") or ParallaxClientOptions().base_url
+    registrant = ParallaxClient(ParallaxClientOptions(account_token=token, base_url=base_url))
+    finder = ParallaxClient(
+        ParallaxClientOptions(account_token=os.environ.get("PARALLAX_LOOKUP_TOKEN") or token, base_url=base_url)
+    )
 
     stats = registrant.account_stats()
     print("token ok; stats:", stats.to_dict())
@@ -69,12 +74,22 @@ def main() -> None:
         registered = registrant.register(image, manifests)
     except ParallaxProblem as problem:
         sys.exit(f"register refused: {problem.status} {problem.slug}: {problem.detail}")
-    print("registered:", registered.id, "image hash:", registered.image_hash)
+    print(
+        "registered:", registered.id,
+        "image hash:", registered.image_hash,
+        "original image hash:", registered.original_image_hash,
+    )
+    if registered.original_image_hash is None:
+        sys.exit("register did not return an original image hash; there is no record to recover")
 
     found = finder.lookup(image)
     print("lookup matched:", found.matched, "hashes:", found.matched_original_image_hashes)
 
-    record = finder.get_record(registered.image_hash)
+    # Publication follows registration by some seconds; wait_for_record polls (bounded exponential
+    # backoff) instead of a single get_record that could still answer noRecordAnswered.
+    record = finder.wait_for_record(
+        registered.original_image_hash, RecordWaitOptions(poll_interval=2.0, poll_timeout=120.0)
+    )
     print("record outcome:", record.outcome)
 
     report = AttributionVerifier(trust_roots()).verify(record, original_image_bytes=image.data)

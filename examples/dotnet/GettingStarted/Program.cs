@@ -2,6 +2,7 @@
 // recover the record, verify it, take it down.
 //
 // Environment:
+//   PARALLAX_BASE_URL       the API's base URL (defaults to https://api.parallax.xiobjects.com)
 //   PARALLAX_TOKEN          the account token that registers (required)
 //   PARALLAX_LOOKUP_TOKEN   a second account's token that looks the image up (defaults to PARALLAX_TOKEN)
 //   PARALLAX_IMAGE          path of the image to register (required)
@@ -22,9 +23,12 @@ if (!string.IsNullOrEmpty(manifestPath))
 }
 
 var lookupToken = Environment.GetEnvironmentVariable("PARALLAX_LOOKUP_TOKEN");
-using var registrant = new ParallaxClient(new ParallaxClientOptions { AccountToken = token });
+var baseUrl = Environment.GetEnvironmentVariable("PARALLAX_BASE_URL");
+var baseAddress = string.IsNullOrEmpty(baseUrl) ? new ParallaxClientOptions().BaseAddress : new Uri(baseUrl);
+using var registrant = new ParallaxClient(new ParallaxClientOptions { BaseAddress = baseAddress, AccountToken = token });
 using var finder = new ParallaxClient(new ParallaxClientOptions
 {
+    BaseAddress = baseAddress,
     AccountToken = string.IsNullOrEmpty(lookupToken) ? token : lookupToken,
 });
 
@@ -44,12 +48,17 @@ catch (ParallaxProblemException problem)
     return 1;
 }
 
-Console.WriteLine($"registered: {registered.Id} image hash: {registered.ImageHash}");
+Console.WriteLine(
+    $"registered: {registered.Id} image hash: {registered.ImageHash} original image hash: {registered.OriginalImageHash}");
 
 var found = await finder.LookupAsync(image);
 Console.WriteLine($"lookup matched: {found.Matched} hashes: {string.Join(", ", found.MatchedOriginalImageHashes ?? [])}");
 
-var record = await finder.GetRecordAsync(registered.ImageHash!);
+// Publication follows registration by some seconds; wait it out rather than a single look-up.
+// The record store is keyed by the engine's own hash, OriginalImageHash, not REST's ImageHash.
+var record = await finder.WaitForRecordAsync(
+    registered.OriginalImageHash!,
+    new RecordWaitOptions(TimeSpan.FromSeconds(2), TimeSpan.FromMinutes(2)));
 Console.WriteLine($"record outcome: {record.Outcome}");
 
 var report = new AttributionVerifier().Verify(new XioVerifyRecordRequest(record, image.Bytes, await TrustRootsAsync()));

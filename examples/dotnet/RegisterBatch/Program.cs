@@ -3,6 +3,7 @@
 // re-declares every hash and uploads only what the slot does not already hold.
 //
 // Environment:
+//   PARALLAX_BASE_URL           the API's base URL (defaults to https://api.parallax.xiobjects.com)
 //   PARALLAX_TOKEN              the account token (required)
 //   PARALLAX_IMAGES             a folder of images (required)
 //   PARALLAX_IMAGE_TYPE         their media type, for example image/jpeg (required)
@@ -23,8 +24,10 @@ if (images.Count == 0)
     throw new InvalidOperationException($"no files under {folder}");
 }
 
+var baseUrl = Environment.GetEnvironmentVariable("PARALLAX_BASE_URL");
 using var client = new ParallaxClient(new ParallaxClientOptions
 {
+    BaseAddress = string.IsNullOrEmpty(baseUrl) ? new ParallaxClientOptions().BaseAddress : new Uri(baseUrl),
     AccountToken = Required("PARALLAX_TOKEN"),
     Batching = new UploadBatching(long.Parse(Required("PARALLAX_MAX_REQUEST_BYTES")),
                                   int.Parse(Required("PARALLAX_MAX_IMAGES"))),

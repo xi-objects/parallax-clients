@@ -17,17 +17,28 @@ internal sealed class TestPki
     private TestPki(string rootName)
     {
         var rootKeys = NewKeyPair();
+        var intermediateKeys = NewKeyPair();
         LeafKeys = NewKeyPair();
         var rootSubject = new X509Name($"CN={rootName}");
+        var intermediateSubject = new X509Name($"CN={rootName} Intermediate");
+        var leafSubject = new X509Name("CN=Parallax signing service");
         Root = Issue(new CertificateIssue(rootSubject, rootSubject, rootKeys.Public, rootKeys.Private, IsAuthority: true, Serial: 1));
-        Leaf = Issue(new CertificateIssue(rootSubject, new X509Name("CN=Parallax signing service"), LeafKeys.Public, rootKeys.Private, IsAuthority: false, Serial: 2));
+        Leaf = Issue(new CertificateIssue(rootSubject, leafSubject, LeafKeys.Public, rootKeys.Private, IsAuthority: false, Serial: 2));
+        Intermediate = Issue(new CertificateIssue(rootSubject, intermediateSubject, intermediateKeys.Public, rootKeys.Private, IsAuthority: true, Serial: 3));
+        IntermediateLeaf = Issue(new CertificateIssue(intermediateSubject, leafSubject, LeafKeys.Public, intermediateKeys.Private, IsAuthority: false, Serial: 4));
     }
 
     /// <summary>The root certificate.</summary>
     internal X509Certificate Root { get; }
 
-    /// <summary>The leaf certificate the root issued.</summary>
+    /// <summary>The leaf certificate the root issued directly.</summary>
     internal X509Certificate Leaf { get; }
+
+    /// <summary>An intermediate CA certificate the root issued.</summary>
+    internal X509Certificate Intermediate { get; }
+
+    /// <summary>A leaf certificate, sharing the same key as <see cref="Leaf"/>, that the intermediate issued rather than the root.</summary>
+    internal X509Certificate IntermediateLeaf { get; }
 
     /// <summary>The leaf's key pair, which signs the record.</summary>
     internal AsymmetricCipherKeyPair LeafKeys { get; }
@@ -37,6 +48,12 @@ internal sealed class TestPki
 
     /// <summary>The leaf as PEM.</summary>
     internal string LeafPem => ToPem(Leaf);
+
+    /// <summary>The intermediate CA certificate as PEM.</summary>
+    internal string IntermediatePem => ToPem(Intermediate);
+
+    /// <summary>The intermediate-issued leaf certificate as PEM.</summary>
+    internal string IntermediateLeafPem => ToPem(IntermediateLeaf);
 
     /// <summary>The leaf's raw 32-byte public key.</summary>
     internal byte[] LeafPublicKey => ((Ed25519PublicKeyParameters)LeafKeys.Public).GetEncoded();

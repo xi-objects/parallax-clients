@@ -12,6 +12,7 @@ global using System.Threading;
 global using System.Threading.Tasks;
 global using Microsoft.Kiota.Abstractions;
 global using Microsoft.Kiota.Abstractions.Serialization;
+global using Microsoft.Kiota.Serialization.Json;
 global using Org.BouncyCastle.Asn1.X509;
 global using Org.BouncyCastle.Crypto;
 global using Org.BouncyCastle.Crypto.Generators;
