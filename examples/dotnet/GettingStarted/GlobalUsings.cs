@@ -1,0 +1,15 @@
+global using System;
+global using System.Collections.Generic;
+global using System.IO;
+global using System.Net.Http;
+global using System.Threading;
+global using System.Threading.Tasks;
+global using Microsoft.Kiota.Abstractions.Serialization;
+global using Xio.Parallax.Client;
+global using Xio.Parallax.Client.Generated.Models;
+global using Xio.Parallax.Client.Multipart.Enums;
+global using Xio.Parallax.Client.Multipart.Models;
+global using Xio.Parallax.Client.Problems;
+global using Xio.Parallax.Client.Shared.Models;
+global using Xio.Parallax.Client.Verification.Models;
+global using Xio.Parallax.Client.Verification.Services;

@@ -1,0 +1,37 @@
+[project]
+name = "xio-parallax-client"
+version = "0.1.0"
+description = "Client for the XI Parallax REST API: generated from its OpenAPI document, with the multipart manifests, the slot conversations and the attribution verifier hand-written on top."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "attrs>=26.1.0",
+    "blake3>=1.0.9",
+    "cryptography>=50.0.1",
+    "httpx>=0.28.1",
+    "python-dateutil>=2.9.0.post0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["python/xio_parallax_client"]
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["python/xio_parallax_client/generated"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "respx>=0.23.1",
+    "ruff>=0.16.8",
+]

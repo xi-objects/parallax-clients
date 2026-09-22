@@ -1,0 +1,44 @@
+name: regenerate
+# Refreshes the pinned document from the live API and regenerates both clients when the contract
+# changed. The build commit in info.version changes on every deploy and is ignored.
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: astral-sh/setup-uv@v5
+      - name: Install the Kiota version the lock file names
+        run: |
+          version=$(python3 scripts/kiota-version.py)
+          dotnet tool install --global Microsoft.OpenApi.Kiota --version "$version"
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+      - name: Fetch the live document and compare it with the pin
+        id: compare
+        run: |
+          curl -fsS -o /tmp/live.json https://api.parallax.xiobjects.com/openapi/v1.json
+          if python3 scripts/openapi-changed.py openapi/v1.json /tmp/live.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            cp /tmp/live.json openapi/v1.json
+          fi
+      - if: steps.compare.outputs.changed == 'true'
+        run: sh scripts/generate.sh
+      - if: steps.compare.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: regenerate/openapi
+          title: "Regenerate the clients from the live OpenAPI document"
+          commit-message: "Regenerate the clients from the live OpenAPI document"
+          body: "The live document at api.parallax.xiobjects.com changed. This pull request pins the new document and regenerates both clients from it."

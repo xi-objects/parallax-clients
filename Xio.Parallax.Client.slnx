@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="src/Xio.Parallax.Client/Xio.Parallax.Client.csproj" />
+  <Project Path="tests/Xio.Parallax.Client.Tests/Xio.Parallax.Client.Tests.csproj" />
+  <Folder Name="/examples/">
+    <Project Path="examples/dotnet/GettingStarted/GettingStarted.csproj" />
+    <Project Path="examples/dotnet/RegisterBatch/RegisterBatch.csproj" />
+  </Folder>
+</Solution>

@@ -16,7 +16,7 @@ indent_size = 4
 indent_size = 2
 
 # Generated client code is the generator's, never formatted or reviewed against the standards.
-[src/libs/*/Generated/**]
+[src/*/Generated/**]
 generated_code = true
 
 [python/*/generated/**]
@@ -33,8 +33,12 @@ csharp_preserve_single_line_blocks = true
 # Standards section 6: opening brace on its own new line.
 csharp_new_line_before_open_brace = all
 
+# File-scoped namespaces in every hand-written file; the generated folder is exempt above.
+csharp_style_namespace_declarations = file_scoped:error
+
 # Standards section 14: no using statements in individual files - all usings live in GlobalUsings.cs.
 dotnet_diagnostic.IDE0005.severity = error
+
 
 dotnet_sort_system_directives_first = true
 dotnet_style_qualification_for_field = false:suggestion
