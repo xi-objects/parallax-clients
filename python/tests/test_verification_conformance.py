@@ -22,6 +22,7 @@ from cryptography.x509.oid import NameOID
 from xio_parallax_client.verification import AttributionVerifier, CheckOutcome, TrustRoots
 
 _FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "record"
+_LOOKUP_FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "lookup"
 
 _EXPECTED_PASSED = (
     "originalImageHash",
@@ -77,6 +78,25 @@ def test_real_record_verifies_with_no_failed_check() -> None:
     for name in _EXPECTED_PASSED:
         assert report.outcome(name) is CheckOutcome.PASSED, (name, report.outcome(name))
     assert report.outcome("manifestHash:xi-manifest") is CheckOutcome.NOT_RECOMPUTABLE
+
+
+def test_lookup_record_no_manifests_collection_signature_not_performed() -> None:
+    """A production record from a registration with no manifests (`fixtures/lookup/record.json`):
+    `collectionSignature` is NOT_PERFORMED, not FAILED, since there is no collection to sign. This
+    record chains to `CN=Institute of Provenance Root CA`, which is not carried in this repository,
+    so it is verified here with the dev root instead and `certificateChain` fails for that reason
+    alone.
+    """
+    record = json.loads((_LOOKUP_FIXTURE_DIR / "record.json").read_text(encoding="utf-8"))
+    image = (_LOOKUP_FIXTURE_DIR / "image.png").read_bytes()
+    roots = TrustRoots.from_pem_file(_FIXTURE_DIR / "root.pem")
+    report = AttributionVerifier(roots).verify(record, image)
+
+    for name in ("originalImageHash", "contentHash", "imageSignature", "leafKeyMatchesPublicKey"):
+        assert report.outcome(name) is CheckOutcome.PASSED, (name, report.outcome(name))
+    assert report.outcome("collectionSignature") is CheckOutcome.NOT_PERFORMED
+    assert report.outcome("certificateChain") is CheckOutcome.FAILED
+    assert [c.name for c in report.checks if c.outcome is CheckOutcome.FAILED] == ["certificateChain"]
 
 
 def test_from_orbital_pinned_root_matches_root_pem_file() -> None:

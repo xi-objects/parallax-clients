@@ -23,7 +23,7 @@ from xio_parallax_client.verification import (
     VerificationRefused,
 )
 
-from .verification_support import JUMBF_BYTES, ORIGINAL, Fixture, _pem, _verify, fixture
+from .verification_support import JUMBF_BYTES, ORIGINAL, Fixture, _ca, _chain_record, _leaf_for, _pem, _verify, fixture
 
 __all__ = ["fixture"]
 
@@ -123,6 +123,23 @@ def test_stripped_manifest_fails_collection_signature(fixture: Fixture) -> None:
     report = _verify(fixture, record)
     assert report.passed("manifestSignature:c2pa")
     assert report.outcome("collectionSignature") is CheckOutcome.FAILED
+
+
+def test_collection_signature_removed_with_manifests_fails(fixture: Fixture) -> None:
+    """Manifests exist but `collectionSignature` is stripped: a FAILED verdict, not NOT_PERFORMED."""
+    record = copy.deepcopy(fixture.record)
+    record["verification"]["collectionSignature"] = None
+    report = _verify(fixture, record)
+    assert report.outcome("collectionSignature") is CheckOutcome.FAILED
+
+
+def test_no_manifests_no_collection_signature_not_performed() -> None:
+    """Zero manifests and no `collectionSignature`: nothing was ever there to sign, so NOT_PERFORMED."""
+    root, root_key = _ca("No Manifests Root")
+    leaf, signer = _leaf_for(root, root_key)
+    record = _chain_record(leaf, signer, [root])
+    report = AttributionVerifier(TrustRoots.from_pem([_pem(root)])).verify(record)
+    assert report.outcome("collectionSignature") is CheckOutcome.NOT_PERFORMED
 
 
 @pytest.mark.parametrize(

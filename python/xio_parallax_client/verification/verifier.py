@@ -199,6 +199,10 @@ class AttributionVerifier:
     ) -> VerificationCheck:
         name = "collectionSignature"
         if v.collection_signature is None:
+            if not entries:
+                return VerificationCheck(
+                    name, CheckOutcome.NOT_PERFORMED, "no manifests, so no collection to sign"
+                )
             return VerificationCheck(name, _FAILED, "record declares no collection signature")
         complete = [e for e in entries if e is not None]
         if len(complete) != len(entries):

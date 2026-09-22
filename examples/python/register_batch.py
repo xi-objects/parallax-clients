@@ -10,6 +10,10 @@ Environment:
   PARALLAX_MAX_REQUEST_BYTES  the operator's per-request byte cap (required; not in the document)
   PARALLAX_MAX_IMAGES         the operator's per-request image cap (required)
   PARALLAX_SLOT_ID            optional: an open slot to resume into instead of opening a new one
+  PARALLAX_ATTACH_EMBEDDED_C2PA  "yes" to attach each image's embedded C2PA store as manifest[c2pa]
+
+Each image's manifests are what you choose to attach: a sidecar `<image>.json` beside the file is
+attached as manifest[xi-manifest], and the embedded C2PA store is attached only when asked.
 
 Run from the repository root: uv run python examples/python/register_batch.py
 """
@@ -23,11 +27,15 @@ from pathlib import Path
 from xio_parallax_client import (
     ImageUpload,
     LookupBatchOptions,
+    ManifestForm,
+    ManifestPart,
     ParallaxClient,
     ParallaxClientOptions,
     RegisterBatchOptions,
     RegistrationItem,
     UploadBatching,
+    as_manifest_part,
+    detect_embedded_c2pa,
 )
 from xio_parallax_client.generated.models import SlotProgressResponse
 
@@ -40,13 +48,34 @@ def required(name: str) -> str:
     return value
 
 
+def manifests_for(path: Path, image: ImageUpload, attach_embedded: bool) -> list[ManifestPart]:
+    """The manifests the registrant attaches for one image: its sidecar JSON, and its embedded C2PA store on request."""
+    parts: list[ManifestPart] = []
+    sidecar = path.with_suffix(path.suffix + ".json")
+    if sidecar.is_file():
+        parts.append(ManifestPart("xi-manifest", ManifestForm.JSON, sidecar.read_bytes()))
+    if attach_embedded:
+        found = detect_embedded_c2pa(image.data)
+        if found.store is not None:
+            parts.append(as_manifest_part(found.store))
+    return parts
+
+
 def main() -> None:
-    """Registers every file in the folder, then looks every one of them up."""
+    """Registers every image in the folder with its manifests, then looks every one of them up."""
     content_type = required("PARALLAX_IMAGE_TYPE")
     folder = Path(required("PARALLAX_IMAGES"))
-    images = [ImageUpload.from_file(p, content_type) for p in sorted(folder.iterdir()) if p.is_file()]
+    attach_embedded = os.environ.get("PARALLAX_ATTACH_EMBEDDED_C2PA", "").lower() == "yes"
+    paths = [p for p in sorted(folder.iterdir()) if p.is_file() and p.suffix.lower() != ".json"]
+    images = [ImageUpload.from_file(p, content_type) for p in paths]
     if not images:
-        sys.exit(f"no files under {folder}")
+        sys.exit(f"no images under {folder}")
+    items = [
+        RegistrationItem(image=image, manifests=manifests_for(p, image, attach_embedded))
+        for p, image in zip(paths, images)
+    ]
+    for p, item in zip(paths, items):
+        print(f"  {p.name}: {[m.kind for m in item.manifests] or 'no manifests'}")
 
     client = ParallaxClient(
         ParallaxClientOptions(
@@ -64,8 +93,10 @@ def main() -> None:
         print(f"  progress: registered={counts.registered} failed={counts.failed} retry={counts.retry}")
 
     registered = client.register_batch(
-        [RegistrationItem(image=image) for image in images],
-        RegisterBatchOptions(poll_interval=1.0, poll_timeout=300.0, existing_slot_id=os.environ.get("PARALLAX_SLOT_ID") or None),
+        items,
+        RegisterBatchOptions(
+            poll_interval=1.0, poll_timeout=300.0, existing_slot_id=os.environ.get("PARALLAX_SLOT_ID") or None
+        ),
         on_progress=progress,
     )
     print("slot", registered.slot_id, "committed;", len(registered.upload_outcomes), "uploads this run")

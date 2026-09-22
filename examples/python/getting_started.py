@@ -75,9 +75,12 @@ def main() -> None:
     except ParallaxProblem as problem:
         sys.exit(f"register refused: {problem.status} {problem.slug}: {problem.detail}")
     print(
-        "registered:", registered.id,
-        "image hash:", registered.image_hash,
-        "original image hash:", registered.original_image_hash,
+        "registered:",
+        registered.id,
+        "image hash:",
+        registered.image_hash,
+        "original image hash:",
+        registered.original_image_hash,
     )
     if registered.original_image_hash is None:
         sys.exit("register did not return an original image hash; there is no record to recover")

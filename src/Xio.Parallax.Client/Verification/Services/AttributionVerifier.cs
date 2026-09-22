@@ -90,9 +90,22 @@ public sealed class AttributionVerifier : IAttributionVerifier
             }
         }
 
-        checks.Add(collectable
-            ? _signatureChecker.Check(new XioSignatureCheckRequest(VerificationConstants.CollectionSignatureCheck, admission.PublicKey, _preimageBuilder.Collection(new XioCollectionPreimageRequest(admission.ContentHash, entries)), verification.CollectionSignature))
-            : new VerificationCheck(VerificationConstants.CollectionSignatureCheck, VerificationOutcome.Failed, "A manifest declares no type or no hex hash, so the collection preimage cannot be built."));
+        checks.Add(CollectionSignatureCheck(collectable, manifests.Count, admission, verification, entries));
         return checks;
+    }
+
+    private VerificationCheck CollectionSignatureCheck(bool collectable, int manifestCount, RecordAdmissionResult admission, PublishedRecordVerification verification, List<CanonicalManifestEntry> entries)
+    {
+        if (!collectable)
+        {
+            return new VerificationCheck(VerificationConstants.CollectionSignatureCheck, VerificationOutcome.Failed, "A manifest declares no type or no hex hash, so the collection preimage cannot be built.");
+        }
+
+        if (manifestCount == 0 && string.IsNullOrEmpty(verification.CollectionSignature))
+        {
+            return new VerificationCheck(VerificationConstants.CollectionSignatureCheck, VerificationOutcome.NotPerformed, "The record carries no manifests, so there is no collection to sign.");
+        }
+
+        return _signatureChecker.Check(new XioSignatureCheckRequest(VerificationConstants.CollectionSignatureCheck, admission.PublicKey, _preimageBuilder.Collection(new XioCollectionPreimageRequest(admission.ContentHash, entries)), verification.CollectionSignature));
     }
 }

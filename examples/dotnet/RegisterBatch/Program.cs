@@ -10,18 +10,31 @@
 //   PARALLAX_MAX_REQUEST_BYTES  the operator's per-request byte cap (required; not in the document)
 //   PARALLAX_MAX_IMAGES         the operator's per-request image cap (required)
 //   PARALLAX_SLOT_ID            optional: an open slot to resume into instead of opening a new one
+//   PARALLAX_ATTACH_EMBEDDED_C2PA  "yes" to attach each image's embedded C2PA store as manifest[c2pa]
+//
+// Each image's manifests are what you choose to attach: a sidecar <image>.json beside the file is
+// attached as manifest[xi-manifest], and the embedded C2PA store is attached only when asked.
 //
 // Run from the repository root: dotnet run --project examples/dotnet/RegisterBatch
 
 var contentType = Required("PARALLAX_IMAGE_TYPE");
 var folder = Required("PARALLAX_IMAGES");
-var images = Directory.EnumerateFiles(folder)
+var attachEmbedded = string.Equals(Environment.GetEnvironmentVariable("PARALLAX_ATTACH_EMBEDDED_C2PA"), "yes", StringComparison.OrdinalIgnoreCase);
+var detector = new EmbeddedC2paDetector();
+var paths = Directory.EnumerateFiles(folder)
+    .Where(path => !path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
     .OrderBy(path => path, StringComparer.Ordinal)
-    .Select(path => ImageUpload.FromFile(path, contentType))
     .ToList();
+var images = paths.Select(path => ImageUpload.FromFile(path, contentType)).ToList();
 if (images.Count == 0)
 {
-    throw new InvalidOperationException($"no files under {folder}");
+    throw new InvalidOperationException($"no images under {folder}");
+}
+
+var items = paths.Zip(images, (path, image) => new RegistrationItem(image, ManifestsFor(path, image))).ToList();
+foreach (var (path, item) in paths.Zip(items))
+{
+    Console.WriteLine($"  {Path.GetFileName(path)}: {(item.Manifests.Count == 0 ? "no manifests" : string.Join(", ", item.Manifests.Select(m => m.Kind)))}");
 }
 
 var baseUrl = Environment.GetEnvironmentVariable("PARALLAX_BASE_URL");
@@ -38,7 +51,7 @@ var progress = new Progress<SlotProgressResponse>(p =>
 
 var slotId = Environment.GetEnvironmentVariable("PARALLAX_SLOT_ID");
 var registered = await client.RegisterBatchAsync(
-    images.Select(image => new RegistrationItem(image, [])).ToList(),
+    items,
     new RegisterBatchOptions(TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(5))
     {
         ExistingSlotId = string.IsNullOrEmpty(slotId) ? null : slotId,
@@ -55,6 +68,28 @@ Console.WriteLine($"lookup slot {found.LookupSlotId}");
 foreach (var query in found.Results.Queries ?? [])
 {
     Console.WriteLine($"  {query.ImageHash}: {query.State} matched={query.Result?.Matched}");
+}
+
+// The manifests the registrant attaches for one image: its sidecar JSON, and its embedded C2PA store on request.
+IReadOnlyList<ManifestPart> ManifestsFor(string path, ImageUpload image)
+{
+    var parts = new List<ManifestPart>();
+    var sidecar = path + ".json";
+    if (File.Exists(sidecar))
+    {
+        parts.Add(new ManifestPart("xi-manifest", ManifestForm.Json, File.ReadAllBytes(sidecar)));
+    }
+
+    if (attachEmbedded)
+    {
+        var found = detector.Detect(image.Bytes);
+        if (found.Store is not null)
+        {
+            parts.Add(C2paAttachment.AsManifestPart(found.Store));
+        }
+    }
+
+    return parts;
 }
 
 static string Required(string name)

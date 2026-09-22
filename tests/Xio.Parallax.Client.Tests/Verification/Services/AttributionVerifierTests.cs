@@ -122,6 +122,30 @@ public sealed class AttributionVerifierTests
     }
 
     [Fact]
+    public void Manifests_present_but_the_collection_signature_removed_fails_the_collection_check()
+    {
+        var record = SignedRecordFactory.Create(_pki);
+        record.Verification!.CollectionSignature = null;
+
+        var report = Verify(record, SignedRecordFactory.ImageBytes);
+
+        Assert.Equal(VerificationOutcome.Failed, Outcome(report, "collectionSignature"));
+    }
+
+    [Fact]
+    public void No_manifests_and_no_collection_signature_is_not_performed()
+    {
+        var record = SignedRecordFactory.Create(_pki);
+        record.Manifests!.Clear();
+        record.Verification!.CollectionSignature = null;
+
+        var report = Verify(record, SignedRecordFactory.ImageBytes);
+
+        Assert.Equal(VerificationOutcome.NotPerformed, Outcome(report, "collectionSignature"));
+        Assert.False(report.AnyFailed);
+    }
+
+    [Fact]
     public void A_wrong_public_key_fails_the_leaf_key_match_and_every_signature()
     {
         var record = SignedRecordFactory.Create(_pki);
