@@ -23,3 +23,6 @@ dist/
 # local artifacts
 .worktrees/
 artifacts/
+
+# local inputs for the examples: tokens and URLs, never tracked (.env.example names them)
+.env

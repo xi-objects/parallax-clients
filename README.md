@@ -120,8 +120,9 @@ sequence; `examples/dotnet/RegisterBatch` and `examples/python/register_batch.py
 folder through one slot conversation and look it up through another;
 `examples/dotnet/C2paRoundTrip` and `examples/python/c2pa_round_trip.py` detect an embedded
 store, attach it on request, and compare the found file with the recovered record. Each reads its
-inputs from environment variables named in its header. All of them have been run against the
-API's own e2e stack.
+inputs from environment variables named in its header; `.env.example` names them all, and a git-ignored
+`.env` holds your values. All of them have been run against the API's own e2e stack and against
+production, with the roots pinned from the live Orbital's `/info`.
 
 ## Building
 
