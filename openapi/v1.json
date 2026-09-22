@@ -1,0 +1,3402 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Xio.Parallax.Rest",
+    "version": "1.0.0+acd6474"
+  },
+  "servers": [
+    {
+      "url": "https://api.parallax.xiobjects.com"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Shared"
+        ],
+        "summary": "Report the service's name and the build it is running.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/accounts/{accountId}/custody-events": {
+      "get": {
+        "tags": [
+          "Custody"
+        ],
+        "summary": "Export one page of an account's custody events, ordered oldest first.",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "The nextCursor of the previous page. Absent reads the first page; a value that is not a positive integer is refused 400.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many events to read. Absent leaves the page size to the ledger; a value that is not an integer is refused 400.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustodyEventsPageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AdminKey": [ ]
+          }
+        ]
+      }
+    },
+    "/slots/{slotId}/uploads": {
+      "post": {
+        "tags": [
+          "Slots"
+        ],
+        "summary": "Upload images, and the manifests each carries, into a registration slot.",
+        "parameters": [
+          {
+            "name": "slotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Zero or more manifest parts followed by the image part they belong to, repeated per image. One image's outcome never refuses its siblings.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "manifest[<kind>]": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "The manifests of the image part that follows. Manifest kind must be 1 to 64 characters of A-Z, a-z, 0-9, '.', '_' or '-'. The part's own Content-Type gives the manifest's form, with no default. One part is bounded by SlotUpload:MaxManifestBytes and one image carries at most SlotUpload:MaxManifestsPerImage of them."
+                    },
+                    "description": "The manifests of the image part that follows. Manifest kind must be 1 to 64 characters of A-Z, a-z, 0-9, '.', '_' or '-'. The part's own Content-Type gives the manifest's form, with no default. One part is bounded by SlotUpload:MaxManifestBytes and one image carries at most SlotUpload:MaxManifestsPerImage of them."
+                  },
+                  "image": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One image to register. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes.",
+                      "format": "binary"
+                    },
+                    "description": "One image to register. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes."
+                  }
+                }
+              },
+              "encoding": {
+                "manifest[<kind>]": {
+                  "contentType": "application/json, application/jumbf, application/c2pa"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/slots/{slotId}/manifest": {
+      "get": {
+        "tags": [
+          "Slots"
+        ],
+        "summary": "Report every entry a registration slot holds, and what it knows of each.",
+        "description": "Every entry's state is one of: held, registered, answered, failed, errata, retry. \"retry\" says the engine could not answer that entry yet: nothing was registered, answered or charged for it, and because a commit is terminal this service never re-sends it - the client sends that image again, in a new slot or through the single route.",
+        "parameters": [
+          {
+            "name": "slotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotManifestResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/slots/{slotId}/entries/{imageHash}/manifests": {
+      "put": {
+        "tags": [
+          "Slots"
+        ],
+        "summary": "Replace, as one whole list, the manifests one held entry carries.",
+        "parameters": [
+          {
+            "name": "slotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "imageHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The entry's whole new manifest list. A well-formed body carrying no manifest part clears it.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "manifest[<kind>]": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One manifest of the entry's new list. Manifest kind must be 1 to 64 characters of A-Z, a-z, 0-9, '.', '_' or '-'. The part's own Content-Type gives the manifest's form, with no default. One part is bounded by SlotUpload:MaxManifestBytes and one image carries at most SlotUpload:MaxManifestsPerImage of them."
+                    },
+                    "description": "One manifest of the entry's new list. Manifest kind must be 1 to 64 characters of A-Z, a-z, 0-9, '.', '_' or '-'. The part's own Content-Type gives the manifest's form, with no default. One part is bounded by SlotUpload:MaxManifestBytes and one image carries at most SlotUpload:MaxManifestsPerImage of them."
+                  }
+                }
+              },
+              "encoding": {
+                "manifest[<kind>]": {
+                  "contentType": "application/json, application/jumbf, application/c2pa"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotManifestEntryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/slots/{slotId}/entries/{imageHash}": {
+      "delete": {
+        "tags": [
+          "Slots"
+        ],
+        "summary": "Remove one entry from a registration slot; a repeated call changes nothing.",
+        "parameters": [
+          {
+            "name": "slotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "imageHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/slots/{slotId}/uploads/missing": {
+      "post": {
+        "tags": [
+          "Slots"
+        ],
+        "summary": "Answer which of the declared image hashes a registration slot does not already hold.",
+        "parameters": [
+          {
+            "name": "slotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeRequestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/account/stats": {
+      "get": {
+        "tags": [
+          "Usage"
+        ],
+        "summary": "Report the calling account's own grants, what it has spent and its lifetime call count.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountStatsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/slots/{slotId}/commit": {
+      "post": {
+        "tags": [
+          "Slots"
+        ],
+        "summary": "Commit a registration slot: register everything it holds, then close it.",
+        "description": "Every entry's state is one of: held, registered, answered, failed, errata, retry. \"retry\" says the engine could not answer that entry yet: nothing was registered, answered or charged for it, and because a commit is terminal this service never re-sends it - the client sends that image again, in a new slot or through the single route.",
+        "parameters": [
+          {
+            "name": "slotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotCommitResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/slots/{slotId}/progress": {
+      "get": {
+        "tags": [
+          "Slots"
+        ],
+        "summary": "Poll a registration slot's state and every entry's commit outcome.",
+        "description": "Every entry's state is one of: held, registered, answered, failed, errata, retry. \"retry\" says the engine could not answer that entry yet: nothing was registered, answered or charged for it, and because a commit is terminal this service never re-sends it - the client sends that image again, in a new slot or through the single route.",
+        "parameters": [
+          {
+            "name": "slotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotProgressResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/registrations": {
+      "post": {
+        "tags": [
+          "Registrations"
+        ],
+        "summary": "Register one image, and the manifests it carries, in a single request.",
+        "description": "Refused 409 when an original of the image is already registered, the problem's detail being one of: This image is already registered. This image is a derivative of an image that is already registered. A registrationId extension names the already-registered original only when it is the caller's own.",
+        "requestBody": {
+          "description": "Zero or more manifest parts, all of which must precede the one image part.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "manifest[<kind>]": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "One manifest the image carries. Manifest kind must be 1 to 64 characters of A-Z, a-z, 0-9, '.', '_' or '-'. The part's own Content-Type gives the manifest's form, with no default. One part is bounded by SlotUpload:MaxManifestBytes and one image carries at most SlotUpload:MaxManifestsPerImage of them."
+                    },
+                    "description": "One manifest the image carries. Manifest kind must be 1 to 64 characters of A-Z, a-z, 0-9, '.', '_' or '-'. The part's own Content-Type gives the manifest's form, with no default. One part is bounded by SlotUpload:MaxManifestBytes and one image carries at most SlotUpload:MaxManifestsPerImage of them."
+                  },
+                  "image": {
+                    "type": "string",
+                    "description": "The one image to register. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes.",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "manifest[<kind>]": {
+                  "contentType": "application/json, application/jumbf, application/c2pa"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterSingleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported Media Type",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "headers": {
+              "Retry-After": {
+                "description": "Whole seconds to wait before sending the same request again.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/registrations/{registrationId}": {
+      "delete": {
+        "tags": [
+          "Registrations"
+        ],
+        "summary": "Take the caller's own registration down and delete it.",
+        "parameters": [
+          {
+            "name": "registrationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/accounts": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Create an account with its registration and look-up grants.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AdminKey": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/accounts/{accountId}/tokens": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Mint a token for an account, answering its plaintext value exactly once.",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MintTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MintTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AdminKey": [ ]
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "List an account's tokens; a token's hash is never reported.",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TokenResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AdminKey": [ ]
+          }
+        ]
+      }
+    },
+    "/admin/accounts/{accountId}/tokens/{tokenId}/revoke": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Revoke one of an account's tokens; a repeated call changes nothing.",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "tokenId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AdminKey": [ ]
+          }
+        ]
+      }
+    },
+    "/slots": {
+      "post": {
+        "tags": [
+          "Slots"
+        ],
+        "summary": "Open a registration slot for the calling account.",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotOpenResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/slots/{slotId}": {
+      "get": {
+        "tags": [
+          "Slots"
+        ],
+        "summary": "Report one registration slot's state and how many entries it holds.",
+        "parameters": [
+          {
+            "name": "slotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Slots"
+        ],
+        "summary": "Abandon a registration slot, releasing everything it holds.",
+        "parameters": [
+          {
+            "name": "slotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/lookup": {
+      "post": {
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Look one image up: is it registered, and is the match the caller's own?",
+        "requestBody": {
+          "description": "Exactly one image file part and nothing else. The request carries no query-string parameter and no caller-set matching parameter; either is refused 400.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "The query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes.",
+                    "format": "binary"
+                  },
+                  "description": "The query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes."
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "headers": {
+              "Retry-After": {
+                "description": "Whole seconds to wait before sending the same request again.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/lookup/slots": {
+      "post": {
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Open a look-up slot for the calling account.",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupSlotOpenResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/lookup/slots/{lookupSlotId}/queries": {
+      "post": {
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Upload query images into a look-up slot; no verdict is reached until commit.",
+        "parameters": [
+          {
+            "name": "lookupSlotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Image file parts and nothing else - a form part refuses the whole request, as does any query-string parameter. A query image carries no manifest.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes.",
+                    "format": "binary"
+                  },
+                  "description": "One query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes."
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotUploadResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/lookup/slots/{lookupSlotId}/queries/missing": {
+      "post": {
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Answer which of the declared image hashes a look-up slot does not already hold.",
+        "parameters": [
+          {
+            "name": "lookupSlotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeRequestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/lookup/slots/{lookupSlotId}/manifest": {
+      "get": {
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Report every query a look-up slot holds.",
+        "description": "Every entry's state is one of: held, registered, answered, failed, errata, retry. \"retry\" says the engine could not answer that entry yet: nothing was registered, answered or charged for it, and because a commit is terminal this service never re-sends it - the client sends that image again, in a new slot or through the single route.",
+        "parameters": [
+          {
+            "name": "lookupSlotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotManifestResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/lookup/slots/{lookupSlotId}/entries/{imageHash}": {
+      "delete": {
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Remove one held query from a look-up slot; a repeated call changes nothing.",
+        "parameters": [
+          {
+            "name": "lookupSlotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "imageHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/lookup/slots/{lookupSlotId}/commit": {
+      "post": {
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Commit a look-up slot: look every held query up, then close it.",
+        "description": "Every entry's state is one of: held, registered, answered, failed, errata, retry. \"retry\" says the engine could not answer that entry yet: nothing was registered, answered or charged for it, and because a commit is terminal this service never re-sends it - the client sends that image again, in a new slot or through the single route.",
+        "parameters": [
+          {
+            "name": "lookupSlotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResultsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/lookup/slots/{lookupSlotId}/progress": {
+      "get": {
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Poll a look-up slot's state and every query's own.",
+        "description": "Every entry's state is one of: held, registered, answered, failed, errata, retry. \"retry\" says the engine could not answer that entry yet: nothing was registered, answered or charged for it, and because a commit is terminal this service never re-sends it - the client sends that image again, in a new slot or through the single route.",
+        "parameters": [
+          {
+            "name": "lookupSlotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotProgressResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/lookup/slots/{lookupSlotId}/results": {
+      "get": {
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Read every query's verdict, until the slot's TTL takes it.",
+        "description": "Every entry's state is one of: held, registered, answered, failed, errata, retry. \"retry\" says the engine could not answer that entry yet: nothing was registered, answered or charged for it, and because a commit is terminal this service never re-sends it - the client sends that image again, in a new slot or through the single route.",
+        "parameters": [
+          {
+            "name": "lookupSlotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResultsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/lookup/slots/{lookupSlotId}": {
+      "delete": {
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Abandon a look-up slot, releasing every query it holds.",
+        "parameters": [
+          {
+            "name": "lookupSlotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/records/{originalImageHash}": {
+      "get": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "Recover one image's published record: the manifests it was registered with and the material to verify them.",
+        "parameters": [
+          {
+            "name": "originalImageHash",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedRecordResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "headers": {
+              "Retry-After": {
+                "description": "Whole seconds to wait before sending the same request again.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/records": {
+      "post": {
+        "tags": [
+          "Records"
+        ],
+        "summary": "Recover the published records for a list of original image hashes, one answer per hash.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishedRecordsRequestBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedRecordsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountResponse": {
+        "required": [
+          "id",
+          "name",
+          "status",
+          "registrationGrant",
+          "lookupGrant",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "registrationGrant": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lookupGrant": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AccountStatsGrantResponse": {
+        "required": [
+          "grant",
+          "consumed",
+          "held",
+          "remaining"
+        ],
+        "type": "object",
+        "properties": {
+          "grant": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "consumed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "held": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "remaining": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "AccountStatsResponse": {
+        "required": [
+          "registrations",
+          "lookups",
+          "callCount"
+        ],
+        "type": "object",
+        "properties": {
+          "registrations": {
+            "$ref": "#/components/schemas/AccountStatsGrantResponse"
+          },
+          "lookups": {
+            "$ref": "#/components/schemas/AccountStatsGrantResponse"
+          },
+          "callCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CreateAccountRequest": {
+        "required": [
+          "name",
+          "registrationGrant",
+          "lookupGrant"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "registrationGrant": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lookupGrant": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CustodyEventResponse": {
+        "required": [
+          "id",
+          "accountId",
+          "slotId",
+          "poolKey",
+          "imageHash",
+          "kind",
+          "byteLength",
+          "custodyPath",
+          "verifiedAbsentAt",
+          "occurredAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slotId": {
+            "type": "string"
+          },
+          "poolKey": {
+            "type": "string"
+          },
+          "imageHash": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "byteLength": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "custodyPath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "verifiedAbsentAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CustodyEventsPageResponse": {
+        "required": [
+          "events",
+          "nextCursor"
+        ],
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustodyEventResponse"
+            }
+          },
+          "nextCursor": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "HealthResponse": {
+        "required": [
+          "service",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "LookupCandidate": {
+        "required": [
+          "registrationId"
+        ],
+        "type": "object",
+        "properties": {
+          "registrationId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "LookupQueryResultResponse": {
+        "required": [
+          "imageHash",
+          "state",
+          "result",
+          "failureReason"
+        ],
+        "type": "object",
+        "properties": {
+          "imageHash": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LookupResponse"
+              }
+            ]
+          },
+          "failureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "LookupResponse": {
+        "required": [
+          "matched",
+          "matchedOriginalImageHashes",
+          "candidates"
+        ],
+        "type": "object",
+        "properties": {
+          "matched": {
+            "type": "boolean"
+          },
+          "matchedOriginalImageHashes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupCandidate"
+            }
+          }
+        }
+      },
+      "LookupResultsResponse": {
+        "required": [
+          "lookupSlotId",
+          "queries"
+        ],
+        "type": "object",
+        "properties": {
+          "lookupSlotId": {
+            "type": "string"
+          },
+          "queries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupQueryResultResponse"
+            }
+          }
+        }
+      },
+      "LookupSlotOpenResponse": {
+        "required": [
+          "lookupSlotId",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "lookupSlotId": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MintTokenRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "MintTokenResponse": {
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "token": {
+            "type": "string"
+          }
+        }
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PublishedRecordOutcome": {
+        "enum": [
+          "published",
+          "noRecordAnswered",
+          "takenDown",
+          "refused",
+          "retry"
+        ]
+      },
+      "PublishedRecordResponse": {
+        "required": [
+          "originalImageHash",
+          "outcome",
+          "manifests",
+          "verification",
+          "failureReason"
+        ],
+        "type": "object",
+        "properties": {
+          "originalImageHash": {
+            "type": "string"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/PublishedRecordOutcome"
+          },
+          "manifests": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "required": [
+                "type",
+                "form",
+                "payload"
+              ],
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "description": "The manifest kind exactly as the caller stated it on its part name; validated against no registry."
+                },
+                "form": {
+                  "enum": [
+                    "json",
+                    "jumbf"
+                  ],
+                  "type": "string",
+                  "description": "The form the payload is carried in, taken from the part's own Content-Type at upload."
+                },
+                "payload": {
+                  "description": "The payload's own bytes: the JSON object inline and verbatim for form \"json\", base64 text for form \"jumbf\"."
+                },
+                "hash": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "The record's BLAKE3-256 hash over this manifest's STORED bytes, lowercase hex; null on a record that declares none."
+                },
+                "signature": {
+                  "type": [
+                    "null",
+                    "string"
+                  ],
+                  "description": "This manifest's own signature by the registrant's leaf key, base64; null on a record that declares none."
+                }
+              },
+              "description": "One manifest off a published record, with the hash and the signature that record declares over it."
+            }
+          },
+          "verification": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PublishedRecordVerification"
+              }
+            ]
+          },
+          "failureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PublishedRecordVerification": {
+        "required": [
+          "contentHash",
+          "hashAlgorithm",
+          "signedAtUtc",
+          "signature",
+          "signatureAlgorithm",
+          "publicKey",
+          "leafCertificate",
+          "certificateChain",
+          "leafCertificateThumbprint",
+          "trustContext",
+          "trustVersion",
+          "canonicalVersion",
+          "collectionSignature"
+        ],
+        "type": "object",
+        "properties": {
+          "contentHash": {
+            "type": "string"
+          },
+          "hashAlgorithm": {
+            "type": "string"
+          },
+          "signedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "signatureAlgorithm": {
+            "type": "string"
+          },
+          "publicKey": {
+            "type": "string"
+          },
+          "leafCertificate": {
+            "type": "string"
+          },
+          "certificateChain": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "leafCertificateThumbprint": {
+            "type": "string"
+          },
+          "trustContext": {
+            "type": "string"
+          },
+          "trustVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "canonicalVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "collectionSignature": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PublishedRecordsRequestBody": {
+        "required": [
+          "originalImageHashes"
+        ],
+        "type": "object",
+        "properties": {
+          "originalImageHashes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PublishedRecordsResponse": {
+        "required": [
+          "records"
+        ],
+        "type": "object",
+        "properties": {
+          "records": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublishedRecordResponse"
+            }
+          }
+        }
+      },
+      "RegisterSingleResponse": {
+        "required": [
+          "id",
+          "imageHash",
+          "originalImageHash",
+          "engineRecord"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "imageHash": {
+            "type": "string"
+          },
+          "originalImageHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "engineRecord": {
+            "type": "string"
+          }
+        }
+      },
+      "ResumeRequestBody": {
+        "required": [
+          "hashes"
+        ],
+        "type": "object",
+        "properties": {
+          "hashes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ResumeResponse": {
+        "required": [
+          "missing"
+        ],
+        "type": "object",
+        "properties": {
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SlotCommitEntryResponse": {
+        "required": [
+          "imageHash",
+          "state",
+          "registrationId",
+          "failureReason"
+        ],
+        "type": "object",
+        "properties": {
+          "imageHash": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "registrationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "failureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SlotCommitResponse": {
+        "required": [
+          "slotId",
+          "status",
+          "entries"
+        ],
+        "type": "object",
+        "properties": {
+          "slotId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SlotCommitEntryResponse"
+            }
+          }
+        }
+      },
+      "SlotManifestEntryResponse": {
+        "required": [
+          "imageHash",
+          "manifestsHash",
+          "byteLength",
+          "contentType",
+          "createdAt",
+          "state",
+          "notRegisteredReason"
+        ],
+        "type": "object",
+        "properties": {
+          "imageHash": {
+            "type": "string"
+          },
+          "manifestsHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "byteLength": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "contentType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string"
+          },
+          "notRegisteredReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SlotManifestResponse": {
+        "required": [
+          "entries"
+        ],
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SlotManifestEntryResponse"
+            }
+          }
+        }
+      },
+      "SlotOpenResponse": {
+        "required": [
+          "slotId",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "slotId": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SlotProgressCounts": {
+        "required": [
+          "total",
+          "held",
+          "registered",
+          "answered",
+          "failed",
+          "errata",
+          "retry"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "held": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "registered": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "answered": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "failed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "errata": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retry": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "SlotProgressEntryResponse": {
+        "required": [
+          "imageHash",
+          "state",
+          "registrationId",
+          "failureReason"
+        ],
+        "type": "object",
+        "properties": {
+          "imageHash": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "registrationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "failureReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SlotProgressResponse": {
+        "required": [
+          "slotId",
+          "status",
+          "counts",
+          "entries"
+        ],
+        "type": "object",
+        "properties": {
+          "slotId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/SlotProgressCounts"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SlotProgressEntryResponse"
+            }
+          }
+        }
+      },
+      "SlotResponse": {
+        "required": [
+          "slotId",
+          "status",
+          "entryCount",
+          "openedAt",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "slotId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "entryCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SlotUploadOutcomeResponse": {
+        "required": [
+          "partIndex",
+          "fileName",
+          "accepted",
+          "imageHash",
+          "rejectionReason",
+          "registrationRemaining",
+          "lookupRemaining",
+          "registrationId"
+        ],
+        "type": "object",
+        "properties": {
+          "partIndex": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fileName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "accepted": {
+            "type": "boolean"
+          },
+          "imageHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rejectionReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "registrationRemaining": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lookupRemaining": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "registrationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "SlotUploadResponse": {
+        "required": [
+          "outcomes"
+        ],
+        "type": "object",
+        "properties": {
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SlotUploadOutcomeResponse"
+            }
+          }
+        }
+      },
+      "TokenResponse": {
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "revokedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revokedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "The account token issued at account creation.",
+        "scheme": "bearer"
+      },
+      "AdminKey": {
+        "type": "apiKey",
+        "description": "The admin key held in xio-kv, for admin-only endpoints.",
+        "name": "X-Admin-Key",
+        "in": "header"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Admin"
+    },
+    {
+      "name": "Custody"
+    },
+    {
+      "name": "Lookup"
+    },
+    {
+      "name": "Records"
+    },
+    {
+      "name": "Registrations"
+    },
+    {
+      "name": "Shared"
+    },
+    {
+      "name": "Slots"
+    },
+    {
+      "name": "Usage"
+    }
+  ]
+}

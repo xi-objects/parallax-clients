@@ -1,0 +1,51 @@
+# Encodes what `dotnet format --verify-no-changes` and ruff check against this tree; the C# rules
+# mirror the sibling xio_parallax_rest so the two repositories format alike.
+root = true
+
+[*]
+indent_style = space
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{cs,py}]
+indent_size = 4
+
+[*.{json,xml,slnx,editorconfig,yml,yaml,toml}]
+indent_size = 2
+
+# Generated client code is the generator's, never formatted or reviewed against the standards.
+[src/libs/*/Generated/**]
+generated_code = true
+
+[python/*/generated/**]
+generated_code = true
+
+# Standards section 11: file-length target is 300 lines, hard cap 500 - enforced by review, not by format.
+
+[*.cs]
+# Standards section 6: braces are required on every conditional, even single-line.
+csharp_prefer_braces = true:error
+csharp_preserve_single_line_statements = false
+csharp_preserve_single_line_blocks = true
+
+# Standards section 6: opening brace on its own new line.
+csharp_new_line_before_open_brace = all
+
+# Standards section 14: no using statements in individual files - all usings live in GlobalUsings.cs.
+dotnet_diagnostic.IDE0005.severity = error
+
+dotnet_sort_system_directives_first = true
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_space_after_keywords_in_control_flow_statements = true

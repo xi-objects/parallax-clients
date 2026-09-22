@@ -1,0 +1,24 @@
+# secrets and per-machine settings
+.mcp.json
+.claude/settings.local.json
+
+# .NET
+bin/
+obj/
+.vs/
+*.user
+*.suo
+TestResults/
+*.binlog
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+dist/
+*.egg-info/
+
+# local artifacts
+.worktrees/
