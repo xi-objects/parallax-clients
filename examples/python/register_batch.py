@@ -65,7 +65,7 @@ def main() -> None:
 
     registered = client.register_batch(
         [RegistrationItem(image=image) for image in images],
-        RegisterBatchOptions(poll_interval=1.0, poll_timeout=300.0, existing_slot_id=os.environ.get("PARALLAX_SLOT_ID")),
+        RegisterBatchOptions(poll_interval=1.0, poll_timeout=300.0, existing_slot_id=os.environ.get("PARALLAX_SLOT_ID") or None),
         on_progress=progress,
     )
     print("slot", registered.slot_id, "committed;", len(registered.upload_outcomes), "uploads this run")

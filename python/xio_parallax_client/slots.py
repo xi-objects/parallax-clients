@@ -19,6 +19,12 @@ from .multipart import ImageUpload, ManifestPart
 from .options import UploadBatching
 
 
+def _refuse_blank(name: str, value: str | None) -> None:
+    """Raises `ValueError` when an optional id is present but blank."""
+    if value is not None and not value.strip():
+        raise ValueError(f"{name} is blank; omit it to open a new slot")
+
+
 @dataclass(frozen=True, slots=True)
 class RegistrationItem:
     """One image and the manifests to attach to it, as one entry of a `register_batch` call."""
@@ -40,6 +46,10 @@ class RegisterBatchOptions:
     poll_timeout: float
     existing_slot_id: str | None = None
 
+    def __post_init__(self) -> None:
+        """Refuses an empty slot id: omit it to open a new slot, never pass a blank one."""
+        _refuse_blank("existing_slot_id", self.existing_slot_id)
+
 
 @dataclass(frozen=True, slots=True)
 class RegisterBatchResult:
@@ -58,6 +68,10 @@ class LookupBatchOptions:
     poll_interval: float
     poll_timeout: float
     existing_lookup_slot_id: str | None = None
+
+    def __post_init__(self) -> None:
+        """Refuses an empty look-up slot id: omit it to open a new slot, never pass a blank one."""
+        _refuse_blank("existing_lookup_slot_id", self.existing_lookup_slot_id)
 
 
 @dataclass(frozen=True, slots=True)

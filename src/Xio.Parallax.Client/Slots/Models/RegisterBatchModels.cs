@@ -20,7 +20,13 @@ public sealed record RegisterBatchOptions(TimeSpan PollInterval,
     /// again over the same items, naming the slot it opened, is how a caller resumes after an
     /// interruption.
     /// </summary>
-    public string? ExistingSlotId { get; init; }
+    public string? ExistingSlotId
+    {
+        get;
+        init => field = value is not null && string.IsNullOrWhiteSpace(value)
+            ? throw new ArgumentException($"ExistingSlotId is blank; omit it to open a new slot.", nameof(value))
+            : value;
+    }
 }
 
 /// <summary>

@@ -16,7 +16,13 @@ public sealed record LookupBatchOptions(TimeSpan PollInterval,
                                          TimeSpan PollTimeout)
 {
     /// <summary>An already-open look-up slot to resume instead of opening a new one.</summary>
-    public string? ExistingLookupSlotId { get; init; }
+    public string? ExistingLookupSlotId
+    {
+        get;
+        init => field = value is not null && string.IsNullOrWhiteSpace(value)
+            ? throw new ArgumentException($"ExistingLookupSlotId is blank; omit it to open a new look-up slot.", nameof(value))
+            : value;
+    }
 }
 
 /// <summary>

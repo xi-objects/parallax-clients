@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+from xio_parallax_client import LookupBatchOptions, RegisterBatchOptions
 from xio_parallax_client.generated.models.slot_progress_counts import SlotProgressCounts
 from xio_parallax_client.generated.models.slot_progress_entry_response import SlotProgressEntryResponse
 from xio_parallax_client.generated.models.slot_progress_response import SlotProgressResponse
@@ -64,3 +66,12 @@ def test_next_poll_delay_doubles_and_caps() -> None:
     assert next_poll_delay(1.0, cap=10.0) == 2.0
     assert next_poll_delay(8.0, cap=10.0) == 10.0
     assert next_poll_delay(20.0, cap=10.0) == 10.0
+
+
+def test_blank_existing_slot_id_is_refused() -> None:
+    """A present-but-blank slot id is a refusal, never a request to /slots//uploads/missing."""
+    with pytest.raises(ValueError, match="existing_slot_id is blank"):
+        RegisterBatchOptions(poll_interval=1.0, poll_timeout=10.0, existing_slot_id="")
+    with pytest.raises(ValueError, match="existing_lookup_slot_id is blank"):
+        LookupBatchOptions(poll_interval=1.0, poll_timeout=10.0, existing_lookup_slot_id="   ")
+    assert RegisterBatchOptions(poll_interval=1.0, poll_timeout=10.0).existing_slot_id is None
