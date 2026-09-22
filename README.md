@@ -13,7 +13,9 @@ the three things a generator cannot give:
   per-manifest, collection and image signatures, and chains the signing certificate to the
   pinned trust roots, so an integrator never takes the API's word for it.
 
-Neither package is published to a registry yet: reference the project or install from the tree.
+The clients are consumed from source, never from a registry: clone or submodule this repository,
+reference `src/Xio.Parallax.Client/Xio.Parallax.Client.csproj` from your solution, and install the
+Python package from the tree (`uv add --editable <path>` or `pip install <path>`).
 
 ## .NET
 

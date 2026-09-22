@@ -2,12 +2,9 @@
   <PropertyGroup>
     <RootNamespace>Xio.Parallax.Client</RootNamespace>
     <AssemblyName>Xio.Parallax.Client</AssemblyName>
-    <PackageId>Xio.Parallax.Client</PackageId>
-    <Version>0.1.0</Version>
-    <Description>Client for the XI Parallax REST API: generated from its OpenAPI document, with the multipart manifests, the slot conversations and the attribution verifier hand-written on top.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <IsPackable>true</IsPackable>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Xio.Parallax.Client.Tests" />

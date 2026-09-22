@@ -16,11 +16,6 @@ jobs:
       - run: dotnet build Xio.Parallax.Client.slnx -c Release --no-restore
       - run: dotnet format Xio.Parallax.Client.slnx --verify-no-changes --no-restore
       - run: dotnet test Xio.Parallax.Client.slnx -c Release --no-build
-      - run: dotnet pack src/Xio.Parallax.Client/Xio.Parallax.Client.csproj -c Release --no-build -o artifacts/nuget
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nuget
-          path: artifacts/nuget
 
   python:
     runs-on: ubuntu-latest
@@ -28,13 +23,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
-      - run: uv run ruff check python
+      - run: uv run ruff check python examples/python
       - run: uv run pytest
-      - run: uv build --out-dir artifacts/python
-      - uses: actions/upload-artifact@v4
-        with:
-          name: python
-          path: artifacts/python
 
   regenerated:
     # The committed generated code must be exactly what the pinned document produces.
