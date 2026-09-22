@@ -89,12 +89,39 @@ come from Orbital's anonymous `GET /info` (`pinnedRoots`), fetched once over TLS
 from a PEM file. Both verifiers carry a conformance test over a real record captured from the
 API's own e2e stack (`fixtures/record/`), and every performed check passes on it.
 
+## Embedded C2PA
+
+The client, never the API, looks inside a file. `detect_embedded_c2pa` / `EmbeddedC2paDetector`
+locates the C2PA manifest store in a JPEG (APP11), PNG (`caBX`), WebP (`C2PA`) or classic TIFF
+(tag 0xCD41) carrier and lists its JUMBF boxes so you can see what it is; an unrecognised carrier
+is reported as unsupported, never as "no C2PA". Attaching is your call: `as_manifest_part` /
+`C2paAttachment.AsManifestPart` turns the store into the `manifest[c2pa]` part you pass to
+`register`. On the finder's side, `compare_with_record` / `C2paRecordComparer` compares the
+found file's store with the recovered record by BLAKE3 of the bytes: `MATCH`, `MISMATCH`,
+`ABSENT_FROM_RECORD` or `NOT_PUBLISHED`. Nothing decodes the claims or validates the C2PA
+signature; the API treats a manifest as opaque bytes and so does the client.
+
+```python
+from xio_parallax_client import detect_embedded_c2pa, as_manifest_part, compare_with_record
+
+found = detect_embedded_c2pa(image.data)
+if found.store is not None:
+    for box in found.store.boxes:
+        print(box.depth * "  ", box.type, box.label, box.length)
+    registered = client.register(image, [as_manifest_part(found.store)])   # explicit
+    record = client.wait_for_record(registered.original_image_hash, wait)
+    print(compare_with_record(found.store, record).outcome)                # MATCH
+```
+
 ## Examples
 
 `examples/dotnet/GettingStarted` and `examples/python/getting_started.py` walk the docs'
 sequence; `examples/dotnet/RegisterBatch` and `examples/python/register_batch.py` register a
-folder through one slot conversation and look it up through another. Each reads its inputs from
-environment variables named in its header.
+folder through one slot conversation and look it up through another;
+`examples/dotnet/C2paRoundTrip` and `examples/python/c2pa_round_trip.py` detect an embedded
+store, attach it on request, and compare the found file with the recovered record. Each reads its
+inputs from environment variables named in its header. All of them have been run against the
+API's own e2e stack.
 
 ## Building
 

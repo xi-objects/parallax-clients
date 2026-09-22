@@ -4,5 +4,6 @@
   <Folder Name="/examples/">
     <Project Path="examples/dotnet/GettingStarted/GettingStarted.csproj" />
     <Project Path="examples/dotnet/RegisterBatch/RegisterBatch.csproj" />
+    <Project Path="examples/dotnet/C2paRoundTrip/C2paRoundTrip.csproj" />
   </Folder>
 </Solution>

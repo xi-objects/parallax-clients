@@ -6,6 +6,17 @@ as one call each, and typed `application/problem+json` refusals.
 """
 
 from .async_client import AsyncParallaxClient
+from .c2pa import (
+    C2paCarrier,
+    C2paComparison,
+    C2paComparisonOutcome,
+    EmbeddedC2paResult,
+    EmbeddedC2paStore,
+    JumbfBoxSummary,
+    as_manifest_part,
+    compare_with_record,
+    detect_embedded_c2pa,
+)
 from .client import ParallaxClient
 from .hashing import sha256_hex
 from .multipart import ImageUpload, ManifestForm, ManifestPart
@@ -22,7 +33,13 @@ from .slots import (
 
 __all__ = [
     "AsyncParallaxClient",
+    "C2paCarrier",
+    "C2paComparison",
+    "C2paComparisonOutcome",
+    "EmbeddedC2paResult",
+    "EmbeddedC2paStore",
     "ImageUpload",
+    "JumbfBoxSummary",
     "LookupBatchOptions",
     "LookupBatchResult",
     "ManifestForm",
@@ -36,5 +53,8 @@ __all__ = [
     "RegisterBatchResult",
     "RegistrationItem",
     "UploadBatching",
+    "as_manifest_part",
+    "compare_with_record",
+    "detect_embedded_c2pa",
     "sha256_hex",
 ]
