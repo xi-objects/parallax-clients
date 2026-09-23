@@ -103,7 +103,7 @@ def main() -> None:
     for entry in registered.final_progress.entries:
         print(f"  {entry.image_hash}: {entry.state} {entry.registration_id or entry.failure_reason or ''}")
 
-    found = client.lookup_batch(images, LookupBatchOptions(poll_interval=1.0, poll_timeout=300.0))
+    found = client.lookup_batch(images, LookupBatchOptions())
     print("lookup slot", found.lookup_slot_id)
     for query in found.results.queries:
         matched = query.result.matched if query.result else None

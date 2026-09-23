@@ -122,12 +122,13 @@ def raise_for_problem(response: _ProblemResponse) -> None:
     raise problem_from_response(response)
 
 
-def resolve_retry_wait(problem: ParallaxProblem, cap: float) -> float | None:
-    """Return the wait, in seconds and capped at `cap`, to retry once after a 503 with `Retry-After`.
+def resolve_retry_wait(problem: ParallaxProblem, cap: float | None = None) -> float | None:
+    """Return the wait, in seconds, to retry once after a 503 with `Retry-After`, capped at `cap`
+    when one is given.
 
     Returns `None` for any problem that is not that one retryable case, since nothing else is
     retried silently.
     """
     if problem.status == 503 and problem.retry_after is not None:
-        return min(problem.retry_after, cap)
+        return problem.retry_after if cap is None else min(problem.retry_after, cap)
     return None

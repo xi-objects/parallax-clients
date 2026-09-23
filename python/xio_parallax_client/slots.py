@@ -1,7 +1,9 @@
 """The slot-conversation types and the pure decisions they need: batch planning, hashing, backoff.
 
 `ParallaxClient.register_batch`/`lookup_batch` and their `AsyncParallaxClient` mirrors do the actual
-I/O (open, upload, commit, poll); everything here is plain, synchronous, and shared between both.
+I/O (open, upload, commit); everything here is plain, synchronous, and shared between both.
+`register_batch` then polls progress to a terminal state. A look-up commit is terminal and answers
+its results directly, so `lookup_batch` never polls: it reads progress once, after commit.
 """
 
 from __future__ import annotations
@@ -63,10 +65,12 @@ class RegisterBatchResult:
 
 @dataclass(frozen=True, slots=True)
 class LookupBatchOptions:
-    """Options for one `lookup_batch` conversation; mirrors `RegisterBatchOptions`."""
+    """Options for one `lookup_batch` conversation: which look-up slot to resume.
 
-    poll_interval: float
-    poll_timeout: float
+    A look-up commit is terminal and answers its results directly, so there is nothing to poll for
+    and no timing to configure here.
+    """
+
     existing_lookup_slot_id: str | None = None
 
     def __post_init__(self) -> None:
@@ -76,7 +80,11 @@ class LookupBatchOptions:
 
 @dataclass(frozen=True, slots=True)
 class LookupBatchResult:
-    """The outcome of one `lookup_batch` conversation."""
+    """The outcome of one `lookup_batch` conversation: the slot, the results its commit answered,
+    and its progress read once right after that commit. A query can still land in the "retry"
+    state here: commit is terminal, so a "retry" query was never re-sent and never will be on this
+    slot.
+    """
 
     lookup_slot_id: str
     results: LookupResultsResponse

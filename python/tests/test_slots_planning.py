@@ -73,5 +73,5 @@ def test_blank_existing_slot_id_is_refused() -> None:
     with pytest.raises(ValueError, match="existing_slot_id is blank"):
         RegisterBatchOptions(poll_interval=1.0, poll_timeout=10.0, existing_slot_id="")
     with pytest.raises(ValueError, match="existing_lookup_slot_id is blank"):
-        LookupBatchOptions(poll_interval=1.0, poll_timeout=10.0, existing_lookup_slot_id="   ")
+        LookupBatchOptions(existing_lookup_slot_id="   ")
     assert RegisterBatchOptions(poll_interval=1.0, poll_timeout=10.0).existing_slot_id is None

@@ -1,19 +1,11 @@
 namespace Xio.Parallax.Client.Slots.Models;
 
 /// <summary>
-/// Options for <see cref="ParallaxClient.LookupBatchAsync"/>: how long to wait between progress
-/// polls, how long to keep polling, and which look-up slot to resume.
+/// Options for <see cref="ParallaxClient.LookupBatchAsync"/>: which look-up slot to resume. A
+/// look-up commit is terminal and answers its results directly, so there is nothing to poll for
+/// and no timing to configure here.
 /// </summary>
-/// <param name="PollInterval">
-/// How long to wait before the first progress poll, and the starting point for the bounded
-/// exponential backoff between later polls. Required: there is no default.
-/// </param>
-/// <param name="PollTimeout">
-/// How long to keep polling before giving up. Required: there is no default, since only the
-/// caller knows how long is reasonable to wait.
-/// </param>
-public sealed record LookupBatchOptions(TimeSpan PollInterval,
-                                         TimeSpan PollTimeout)
+public sealed record LookupBatchOptions
 {
     /// <summary>An already-open look-up slot to resume instead of opening a new one.</summary>
     public string? ExistingLookupSlotId
@@ -26,12 +18,13 @@ public sealed record LookupBatchOptions(TimeSpan PollInterval,
 }
 
 /// <summary>
-/// The outcome of a look-up slot batch: the slot it ran in, its final results, and its final
-/// progress.
+/// The outcome of a look-up slot batch: the slot it ran in, the results its commit answered, and
+/// its progress read once after that commit. A query can still land in the "retry" state here:
+/// commit is terminal, so a "retry" query was never re-sent and never will be on this slot.
 /// </summary>
 /// <param name="LookupSlotId">The look-up slot the batch ran in.</param>
-/// <param name="Results">The slot's results once no entry was left in the "retry" state.</param>
-/// <param name="FinalProgress">The slot's progress once no entry was left in the "retry" state.</param>
+/// <param name="Results">The slot's results, as the commit answered them.</param>
+/// <param name="FinalProgress">The slot's progress, read once right after commit.</param>
 public sealed record LookupBatchResult(string LookupSlotId,
                                         LookupResultsResponse Results,
                                         SlotProgressResponse FinalProgress);

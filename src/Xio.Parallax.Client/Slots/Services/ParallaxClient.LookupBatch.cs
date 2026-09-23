@@ -2,8 +2,9 @@ namespace Xio.Parallax.Client;
 
 /// <summary>
 /// The look-up slot conversation on <see cref="ParallaxClient"/>: open (or resume), declare
-/// hashes and upload only what is missing, commit, poll to a terminal progress, and recover the
-/// results.
+/// hashes and upload only what is missing, and commit. A look-up commit is terminal and answers
+/// the results directly, so this conversation never polls for them; it reads progress once, after
+/// commit, purely to report it.
 /// </summary>
 public sealed partial class ParallaxClient
 {
@@ -11,16 +12,19 @@ public sealed partial class ParallaxClient
 
     /// <summary>
     /// Looks up a batch of images through one look-up slot: opens or resumes a slot, uploads only
-    /// the images the slot is missing, commits, polls until every entry has left the "retry"
-    /// state, and recovers the final results. Running the same call again over the same images,
-    /// naming the slot it opened via <see cref="LookupBatchOptions.ExistingLookupSlotId"/>,
+    /// the images the slot is missing, and commits. The commit is terminal and answers the
+    /// results directly, so this call does not poll; it reads <c>/progress</c> once, after commit,
+    /// to report the final progress, and reads <c>/results</c> only if the commit response body
+    /// came back empty. Two inputs with identical bytes declare and upload one hash once; the
+    /// results, keyed by hash, carry that hash once. Running the same call again over the same
+    /// images, naming the slot it opened via <see cref="LookupBatchOptions.ExistingLookupSlotId"/>,
     /// resumes after an interruption: only what the slot still lacks is uploaded.
     /// </summary>
     /// <param name="images">The images to look up.</param>
-    /// <param name="options">How long to poll and for how long, and which look-up slot to resume.</param>
-    /// <param name="progress">Reported with every progress poll, including the final one.</param>
+    /// <param name="options">Which look-up slot to resume.</param>
+    /// <param name="progress">Reported once, with the progress read after commit.</param>
     /// <param name="cancellationToken">Cancels the whole conversation.</param>
-    /// <returns>The look-up slot's id, its final results, and its final progress.</returns>
+    /// <returns>The look-up slot's id, its results, and its progress once committed.</returns>
     public async Task<LookupBatchResult> LookupBatchAsync(
         IReadOnlyList<ImageUpload> images,
         LookupBatchOptions options,
@@ -38,8 +42,10 @@ public sealed partial class ParallaxClient
         foreach (var image in images)
         {
             var hash = Sha256Hex(image.Bytes);
-            orderedHashes.Add(hash);
-            imagesByHash.TryAdd(hash, image);
+            if (imagesByHash.TryAdd(hash, image))
+            {
+                orderedHashes.Add(hash);
+            }
         }
 
         var missingResponse = await ExecuteAsync(
@@ -68,21 +74,18 @@ public sealed partial class ParallaxClient
                 cancellationToken).ConfigureAwait(false);
         }
 
-        await ExecuteAsync(
+        var committed = await ExecuteNullableAsync(
             () => Api.Lookup.Slots[lookupSlotId].Commit.PostAsync(cancellationToken: cancellationToken),
             cancellationToken).ConfigureAwait(false);
 
-        var finalProgress = await PollUntilNoRetryAsync(
-            () => Api.Lookup.Slots[lookupSlotId].Progress.GetAsync(cancellationToken: cancellationToken),
-            lookupSlotId,
-            options.PollInterval,
-            options.PollTimeout,
-            progress,
-            cancellationToken).ConfigureAwait(false);
-
-        var results = await ExecuteAsync(
+        var results = committed ?? await ExecuteAsync(
             () => Api.Lookup.Slots[lookupSlotId].Results.GetAsync(cancellationToken: cancellationToken),
             cancellationToken).ConfigureAwait(false);
+
+        var finalProgress = await ExecuteAsync(
+            () => Api.Lookup.Slots[lookupSlotId].Progress.GetAsync(cancellationToken: cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+        progress?.Report(finalProgress);
 
         return new LookupBatchResult(lookupSlotId, results, finalProgress);
     }

@@ -21,7 +21,6 @@ from .generated.api.lookup import (
     get_lookup_slots_lookup_slot_id_progress,
     get_lookup_slots_lookup_slot_id_results,
     post_lookup_slots,
-    post_lookup_slots_lookup_slot_id_commit,
     post_lookup_slots_lookup_slot_id_queries_missing,
 )
 from .generated.api.records import get_records_original_image_hash, post_records
@@ -38,6 +37,7 @@ from .generated.models import (
     AccountStatsResponse,
     HealthResponse,
     LookupResponse,
+    LookupResultsResponse,
     PublishedRecordResponse,
     PublishedRecordsRequestBody,
     PublishedRecordsResponse,
@@ -184,15 +184,19 @@ class AsyncParallaxClient:
         options: LookupBatchOptions,
         on_progress: ProgressCallback | None = None,
     ) -> LookupBatchResult:
-        """Async mirror of `ParallaxClient.lookup_batch`."""
+        """Async mirror of `ParallaxClient.lookup_batch`.
+
+        A look-up commit is terminal and answers the results directly, so this call never polls
+        for them: it reads `progress` once, right after commit, purely to report it, and reads
+        `results` only if the commit response body came back empty. Two inputs with identical
+        bytes declare and upload one hash once; the results, keyed by hash, carry that hash once.
+        """
         batching = _require_batching(self.options, "lookup_batch")
 
         if options.existing_lookup_slot_id is not None:
             lookup_slot_id = options.existing_lookup_slot_id
         else:
-            opened = await self._with_503_retry(
-                lambda: post_lookup_slots.asyncio_detailed(client=self.api), options.poll_timeout
-            )
+            opened = await self._with_503_retry(lambda: post_lookup_slots.asyncio_detailed(client=self.api), None)
             lookup_slot_id = _parsed(opened).lookup_slot_id
 
         hash_to_image = slots_module.hash_images(images)
@@ -202,7 +206,7 @@ class AsyncParallaxClient:
                 client=self.api,
                 body=ResumeRequestBody(hashes=list(hash_to_image.keys())),
             ),
-            options.poll_timeout,
+            None,
         )
         missing_hashes = _parsed(missing).missing
 
@@ -210,38 +214,37 @@ class AsyncParallaxClient:
             parts = multipart.build_lookup_parts([hash_to_image[h] for h in batch])
             await self._with_503_retry(
                 lambda parts=parts: self._http().post(f"/lookup/slots/{lookup_slot_id}/queries", files=parts),
-                options.poll_timeout,
+                None,
             )
 
-        await self._with_503_retry(
-            lambda: post_lookup_slots_lookup_slot_id_commit.asyncio_detailed(
-                lookup_slot_id=lookup_slot_id, client=self.api
-            ),
-            options.poll_timeout,
+        commit_response = await self._with_503_retry(
+            lambda: self._http().post(f"/lookup/slots/{lookup_slot_id}/commit"), None
         )
+        results = LookupResultsResponse.from_dict(commit_response.json()) if commit_response.content else None
+        if results is None:
+            fetched = await self._with_503_retry(
+                lambda: get_lookup_slots_lookup_slot_id_results.asyncio_detailed(
+                    lookup_slot_id=lookup_slot_id, client=self.api
+                ),
+                None,
+            )
+            results = _parsed(fetched)
 
-        final_progress = await self._poll_progress(
+        progress_response = await self._with_503_retry(
             lambda: get_lookup_slots_lookup_slot_id_progress.asyncio_detailed(
                 lookup_slot_id=lookup_slot_id, client=self.api
             ),
-            options,
-            on_progress,
+            None,
         )
+        final_progress = _parsed(progress_response)
+        if on_progress is not None:
+            on_progress(final_progress)
 
-        results = await self._with_503_retry(
-            lambda: get_lookup_slots_lookup_slot_id_results.asyncio_detailed(
-                lookup_slot_id=lookup_slot_id, client=self.api
-            ),
-            options.poll_timeout,
-        )
-
-        return LookupBatchResult(
-            lookup_slot_id=lookup_slot_id, results=_parsed(results), final_progress=final_progress
-        )
+        return LookupBatchResult(lookup_slot_id=lookup_slot_id, results=results, final_progress=final_progress)
 
     # -- shared plumbing ----------------------------------------------------------------------
 
-    async def _with_503_retry(self, call: Callable[[], Any], poll_timeout: float) -> Any:
+    async def _with_503_retry(self, call: Callable[[], Any], poll_timeout: float | None) -> Any:
         """Async mirror of `ParallaxClient._with_503_retry`."""
         response = await call()
         if 200 <= int(response.status_code) < 300:
@@ -259,7 +262,7 @@ class AsyncParallaxClient:
     async def _poll_progress(
         self,
         fetch: Callable[[], Any],
-        options: RegisterBatchOptions | LookupBatchOptions,
+        options: RegisterBatchOptions,
         on_progress: ProgressCallback | None,
     ) -> SlotProgressResponse:
         """Async mirror of `ParallaxClient._poll_progress`."""

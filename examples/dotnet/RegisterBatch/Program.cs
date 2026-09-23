@@ -63,7 +63,7 @@ foreach (var entry in registered.FinalProgress.Entries ?? [])
     Console.WriteLine($"  {entry.ImageHash}: {entry.State} {entry.RegistrationId?.ToString() ?? entry.FailureReason}");
 }
 
-var found = await client.LookupBatchAsync(images, new LookupBatchOptions(TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(5)), progress);
+var found = await client.LookupBatchAsync(images, new LookupBatchOptions(), progress);
 Console.WriteLine($"lookup slot {found.LookupSlotId}");
 foreach (var query in found.Results.Queries ?? [])
 {

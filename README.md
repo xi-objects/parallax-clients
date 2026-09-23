@@ -7,8 +7,9 @@ the live document when the contract changes. On top of the generated code each p
 the three things a generator cannot give:
 
 - the multipart request with `manifest[<kind>]` parts, which the document can only describe;
-- the slot conversations (open, upload with resume, commit, poll) as one call each, for
-  registration and for look-up;
+- the slot conversations as one call each, for registration and for look-up: open, upload with
+  resume, commit. Registration then polls progress to a terminal state; a look-up commit is
+  terminal and answers the results directly, so look-up never polls;
 - the attribution verifier: it recomputes the hashes of a recovered record, checks the
   per-manifest, collection and image signatures, and chains the signing certificate to the
   pinned trust roots, so an integrator never takes the API's word for it.

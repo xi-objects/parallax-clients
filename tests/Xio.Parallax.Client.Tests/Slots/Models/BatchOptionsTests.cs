@@ -17,7 +17,7 @@ public sealed class BatchOptionsTests
     [Fact]
     public void A_blank_existing_lookup_slot_id_is_refused()
     {
-        var options = new LookupBatchOptions(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(10));
+        var options = new LookupBatchOptions();
 
         Assert.Null(options.ExistingLookupSlotId);
         Assert.Throws<ArgumentException>(() => options with { ExistingLookupSlotId = string.Empty });

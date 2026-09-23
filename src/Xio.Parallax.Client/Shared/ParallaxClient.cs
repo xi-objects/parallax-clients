@@ -80,15 +80,27 @@ public sealed partial class ParallaxClient : IDisposable
     private async Task<T> ExecuteAsync<T>(Func<Task<T?>> call, CancellationToken cancellationToken)
         where T : class
     {
-        T? result = null;
-        await ExecuteCoreAsync(
-            async () => { result = await call().ConfigureAwait(false); },
-            cancellationToken).ConfigureAwait(false);
+        var result = await ExecuteNullableAsync(call, cancellationToken).ConfigureAwait(false);
         if (result is null)
         {
             throw new ParallaxClientException("The Parallax API returned an empty response body where a value was expected.");
         }
 
+        return result;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="call"/> the same way <see cref="ExecuteAsync{T}"/> does, but returns
+    /// an empty body as <see langword="null"/> instead of throwing: for the few calls, such as a
+    /// look-up commit, where an empty body is a meaningful outcome the caller falls back from.
+    /// </summary>
+    private async Task<T?> ExecuteNullableAsync<T>(Func<Task<T?>> call, CancellationToken cancellationToken)
+        where T : class
+    {
+        T? result = null;
+        await ExecuteCoreAsync(
+            async () => { result = await call().ConfigureAwait(false); },
+            cancellationToken).ConfigureAwait(false);
         return result;
     }
 
