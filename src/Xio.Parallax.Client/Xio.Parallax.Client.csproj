@@ -4,7 +4,15 @@
     <AssemblyName>Xio.Parallax.Client</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
+    <PackageId>Xio.Parallax.Client</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>XI Objects</Authors>
+    <Company>XI Objects</Company>
+    <Description>.NET client for the XI Parallax REST API: image registration, look-up, published records and attribution verification.</Description>
+    <PackageTags>xio;parallax;attribution;c2pa</PackageTags>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Xio.Parallax.Client.Tests" />

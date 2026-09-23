@@ -145,3 +145,10 @@ sh scripts/generate.sh
 `scripts/openapi-changed.py` tells whether two documents are the same contract, ignoring the
 build commit in `info.version`. There is no CI: nothing is shipped. `clients-initial-build.md`
 is the design of record.
+
+## Publishing
+
+`Xio.Parallax.Client` is also published, by hand, as a NuGet package to the XI Objects
+`xiobjects` feed on Azure DevOps Artifacts. Run `.\publish.ps1 [-Version x.y.z]` from the repo
+root (`az login` or `$env:NUGET_PAT` for credentials); the version lives in
+`src/Xio.Parallax.Client/Xio.Parallax.Client.csproj`.
