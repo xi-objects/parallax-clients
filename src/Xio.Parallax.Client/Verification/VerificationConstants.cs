@@ -12,6 +12,13 @@ public static class VerificationConstants
     /// <summary>The only canonical preimage version implemented; its byte leads the manifest and collection preimages.</summary>
     public const byte ImplementedCanonicalVersion = 0x02;
 
+    /// <summary>The legacy canonical version admitted alongside <see cref="ImplementedCanonicalVersion"/>: records registered through
+    /// the older Forensics Lab path. This verifier implements no canonical preimage for it, so a legacy record's manifest and
+    /// collection checks report <see cref="Enums.VerificationOutcome.NotRecomputable"/> or <see cref="Enums.VerificationOutcome.NotPerformed"/>,
+    /// never <see cref="Enums.VerificationOutcome.Passed"/>; the image signature, leaf key and certificate chain checks are unaffected,
+    /// since the image signature is Ed25519 over the content hash bytes alone, with no version framing.</summary>
+    public const byte LegacyCanonicalVersion = 0x00;
+
     /// <summary>The byte length of a BLAKE3-256 digest.</summary>
     public const int Blake3HashLength = 32;
 
@@ -59,4 +66,16 @@ public static class VerificationConstants
 
     /// <summary>The detail of every check that needs the leaf certificate when the record carries no single one.</summary>
     internal const string LeafCertificateUnusableDetail = "The record's leafCertificate is absent or is not exactly one PEM certificate.";
+
+    /// <summary>The detail of a legacy (canonical version 0) manifest hash/signature check when the record declares a value this verifier cannot recompute.</summary>
+    internal const string LegacyManifestHashingUnimplementedDetail = "canonical version 0 manifest hashing is not implemented";
+
+    /// <summary>The detail of a legacy (canonical version 0) manifest hash/signature check when the record declares no value at all.</summary>
+    internal const string LegacyManifestValueAbsentDetail = "the record declares no hash/signature for this manifest";
+
+    /// <summary>The detail of a legacy (canonical version 0) collection signature check when the record declares no collectionSignature.</summary>
+    internal const string LegacyCollectionSignatureAbsentDetail = "The record declares canonical version 0 and no collectionSignature, so there is nothing to check.";
+
+    /// <summary>The detail of a legacy (canonical version 0) collection signature check when the record declares one this verifier cannot recompute.</summary>
+    internal const string LegacyCollectionHashingUnimplementedDetail = "canonical version 0 collection hashing is not implemented.";
 }

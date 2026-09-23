@@ -4,7 +4,7 @@ namespace Xio.Parallax.Client.Verification.Services;
 internal interface IRecordAdmission
 {
     /// <summary>Decodes the content hash and public key once the version and algorithms are admitted.</summary>
-    /// <exception cref="VerificationRefusedException">A canonical version other than 2, an unimplemented hash or signature algorithm, or a content hash that is not a BLAKE3-256 hex digest.</exception>
+    /// <exception cref="VerificationRefusedException">A canonical version other than <see cref="VerificationConstants.LegacyCanonicalVersion"/> (0) or <see cref="VerificationConstants.ImplementedCanonicalVersion"/> (2), an unimplemented hash or signature algorithm, or a content hash that is not a BLAKE3-256 hex digest.</exception>
     RecordAdmissionResult Admit(PublishedRecordVerification verification);
 }
 
@@ -13,9 +13,10 @@ internal sealed class RecordAdmission(IVerificationEncoding _encoding) : IRecord
     public RecordAdmissionResult Admit(PublishedRecordVerification verification)
     {
         ArgumentNullException.ThrowIfNull(verification);
-        if (verification.CanonicalVersion != VerificationConstants.ImplementedCanonicalVersion)
+        var isLegacy = verification.CanonicalVersion == VerificationConstants.LegacyCanonicalVersion;
+        if (!isLegacy && verification.CanonicalVersion != VerificationConstants.ImplementedCanonicalVersion)
         {
-            throw new VerificationRefusedException($"Canonical version {verification.CanonicalVersion?.ToString() ?? VerificationConstants.AbsentValue} is not implemented; only {VerificationConstants.ImplementedCanonicalVersion} is.");
+            throw new VerificationRefusedException($"Canonical version {verification.CanonicalVersion?.ToString() ?? VerificationConstants.AbsentValue} is not implemented; only {VerificationConstants.LegacyCanonicalVersion} (legacy) and {VerificationConstants.ImplementedCanonicalVersion} are.");
         }
 
         if (!string.Equals(verification.HashAlgorithm, VerificationConstants.ImplementedHashAlgorithm, StringComparison.OrdinalIgnoreCase))
@@ -38,6 +39,6 @@ internal sealed class RecordAdmission(IVerificationEncoding _encoding) : IRecord
         var usableKey = publicKey is not null && publicKey.Length == VerificationConstants.Ed25519PublicKeyLength
             ? new ReadOnlyMemory<byte>(publicKey)
             : (ReadOnlyMemory<byte>?)null;
-        return new RecordAdmissionResult(contentHash, usableKey);
+        return new RecordAdmissionResult(contentHash, usableKey, isLegacy);
     }
 }

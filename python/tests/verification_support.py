@@ -185,6 +185,64 @@ def fixture() -> Fixture:
     return _build()
 
 
+def _build_legacy() -> Fixture:
+    """A legacy (canonical version 0) record shaped like a production Forensics Lab registration:
+    a single JUMBF-form `c2pa` manifest declaring no hash or signature, an upper-case hex
+    `contentHash`, and no collection signature. The image signature is still Ed25519 over the
+    content hash bytes alone, so it is signed the same way a canonical version 2 record's is.
+    """
+    root, root_key = _ca("Test Legacy Root")
+    signer = ed25519.Ed25519PrivateKey.generate()
+    leaf = (
+        x509.CertificateBuilder()
+        .subject_name(_name("parallax signing service"))
+        .issuer_name(root.subject)
+        .public_key(signer.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(SIGNED_AT - dt.timedelta(days=30))
+        .not_valid_after(SIGNED_AT + dt.timedelta(days=30))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .sign(root_key, None)
+    )
+    content_hash = blake3.blake3(ORIGINAL).digest()
+    public_raw = signer.public_key().public_bytes_raw()
+    record = {
+        "originalImageHash": content_hash.hex(),
+        "outcome": "published",
+        "manifests": [
+            {
+                "type": "c2pa",
+                "form": "jumbf",
+                "payload": base64.b64encode(JUMBF_BYTES).decode("ascii"),
+                "hash": None,
+                "signature": None,
+            }
+        ],
+        "verification": {
+            "contentHash": content_hash.hex().upper(),
+            "hashAlgorithm": "blake3-256",
+            "signedAtUtc": SIGNED_AT.isoformat().replace("+00:00", "Z"),
+            "signature": _sign(signer, content_hash),
+            "signatureAlgorithm": "ed25519",
+            "publicKey": base64.urlsafe_b64encode(public_raw).decode("ascii").rstrip("="),
+            "leafCertificate": _pem(leaf),
+            "certificateChain": [_pem(root)],
+            "leafCertificateThumbprint": leaf.fingerprint(hashes.SHA256()).hex(),
+            "trustContext": "xi-forensics-v1",
+            "trustVersion": 0,
+            "canonicalVersion": 0,
+            "collectionSignature": None,
+        },
+        "failureReason": None,
+    }
+    return Fixture(record=record, root=root, signer=signer)
+
+
+@pytest.fixture(scope="module")
+def legacy_fixture() -> Fixture:
+    return _build_legacy()
+
+
 def _verify(fx: Fixture, record: Any = None, original: bytes | None = ORIGINAL) -> VerificationReport:
     roots = TrustRoots.from_pem([_pem(fx.root)])
     target = PublishedRecordResponse.from_dict(fx.record if record is None else record)

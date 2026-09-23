@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from ._record import NormalizedManifest, NormalizedRecord, NormalizedVerification, normalize_record
 from .chain import chain_checks
 from .errors import VerificationRefused
-from .preimage import CANONICAL_VERSION, CanonicalPreimage
+from .preimage import CANONICAL_VERSION, LEGACY_CANONICAL_VERSION, CanonicalPreimage
 from .report import CheckOutcome, VerificationCheck, VerificationReport
 from .trust_roots import TrustRoots
 
@@ -23,6 +23,13 @@ _RECOMPUTABLE_FORMS = frozenset({"jumbf", "c2pa"})
 
 _PASSED = CheckOutcome.PASSED
 _FAILED = CheckOutcome.FAILED
+_NOT_RECOMPUTABLE = CheckOutcome.NOT_RECOMPUTABLE
+_NOT_PERFORMED = CheckOutcome.NOT_PERFORMED
+
+_LEGACY_MANIFEST_HASHING_UNIMPLEMENTED = "canonical version 0 manifest hashing is not implemented"
+_LEGACY_MANIFEST_VALUE_ABSENT = "the record declares no hash/signature for this manifest"
+_LEGACY_COLLECTION_SIGNATURE_ABSENT = "canonical version 0 record declares no collectionSignature"
+_LEGACY_COLLECTION_HASHING_UNIMPLEMENTED = "canonical version 0 collection hashing is not implemented"
 
 
 def _b64_standard(text: str) -> bytes:
@@ -65,14 +72,14 @@ class AttributionVerifier:
         """Verify `record` (a `PublishedRecordResponse` or its JSON dict) and return a verdict per check.
 
         Raises `VerificationRefused` for a hash or signature algorithm other than BLAKE3-256 / Ed25519, a
-        canonical version other than 2, a malformed content hash, a record without a verification block,
-        or no trust roots.
+        canonical version other than 0 (legacy) or 2, a malformed content hash, a record without a
+        verification block, or no trust roots.
         """
         if not self._roots.certificates:
             raise VerificationRefused("Control not activated: no roots")
         normalized = normalize_record(record)
         v = normalized.verification
-        content_hash = self._preflight(v)
+        content_hash, is_legacy = self._preflight(v)
 
         report = VerificationReport()
         checks = report.checks
@@ -81,21 +88,29 @@ class AttributionVerifier:
         key, key_raw = self._public_key(v.public_key)
         entries: list[tuple[str, bytes] | None] = []
         for manifest in normalized.manifests:
+            if is_legacy:
+                checks.append(self._legacy_manifest_check(f"manifestHash:{manifest.kind}", manifest.hash_hex))
+                checks.append(self._legacy_manifest_check(f"manifestSignature:{manifest.kind}", manifest.signature_b64))
+                continue
             manifest_hash = self._manifest_hash_bytes(manifest)
             checks.append(self._manifest_hash_check(manifest, manifest_hash))
             checks.append(self._manifest_signature_check(manifest, manifest_hash, content_hash, key))
             entries.append(None if manifest_hash is None else (manifest.kind, manifest_hash))
 
-        checks.append(self._collection_check(v, content_hash, entries, key))
+        checks.append(self._collection_check(v, content_hash, entries, key, is_legacy))
         ok, detail = _ed25519_verify(key, v.signature, content_hash)
         checks.append(VerificationCheck("imageSignature", _PASSED if ok else _FAILED, detail))
         checks.extend(chain_checks(self._roots, v, key_raw))
         return report
 
     @staticmethod
-    def _preflight(v: NormalizedVerification) -> bytes:
-        if v.canonical_version != CANONICAL_VERSION:
-            raise VerificationRefused(f"canonicalVersion {v.canonical_version} is not implemented (only 2)")
+    def _preflight(v: NormalizedVerification) -> tuple[bytes, bool]:
+        is_legacy = v.canonical_version == LEGACY_CANONICAL_VERSION
+        if not is_legacy and v.canonical_version != CANONICAL_VERSION:
+            raise VerificationRefused(
+                f"canonicalVersion {v.canonical_version} is not implemented "
+                f"(only {LEGACY_CANONICAL_VERSION} (legacy) and {CANONICAL_VERSION})"
+            )
         if v.hash_algorithm.upper() != _HASH_ALGORITHM:
             raise VerificationRefused(f"hashAlgorithm {v.hash_algorithm!r} is not implemented (only BLAKE3-256)")
         if v.signature_algorithm.lower() != "ed25519":
@@ -106,7 +121,15 @@ class AttributionVerifier:
             raise VerificationRefused(f"contentHash is not hex: {v.content_hash!r}") from exc
         if len(content_hash) != _HASH_LENGTH:
             raise VerificationRefused(f"contentHash is {len(content_hash)} bytes; BLAKE3-256 is {_HASH_LENGTH}")
-        return content_hash
+        return content_hash, is_legacy
+
+    @staticmethod
+    def _legacy_manifest_check(name: str, declared_value: str | None) -> VerificationCheck:
+        """A legacy (canonical version 0) manifest's hash or signature check: this verifier implements no
+        version-0 canonical preimage, so the declared value, if any, cannot be recomputed; never PASSED."""
+        if not declared_value:
+            return VerificationCheck(name, _NOT_RECOMPUTABLE, _LEGACY_MANIFEST_VALUE_ABSENT)
+        return VerificationCheck(name, _NOT_RECOMPUTABLE, _LEGACY_MANIFEST_HASHING_UNIMPLEMENTED)
 
     @staticmethod
     def _original_hashes(
@@ -196,8 +219,13 @@ class AttributionVerifier:
         content_hash: bytes,
         entries: list[tuple[str, bytes] | None],
         key: Ed25519PublicKey | None,
+        is_legacy: bool,
     ) -> VerificationCheck:
         name = "collectionSignature"
+        if is_legacy:
+            if v.collection_signature is None:
+                return VerificationCheck(name, _NOT_PERFORMED, _LEGACY_COLLECTION_SIGNATURE_ABSENT)
+            return VerificationCheck(name, _NOT_RECOMPUTABLE, _LEGACY_COLLECTION_HASHING_UNIMPLEMENTED)
         if v.collection_signature is None:
             if not entries:
                 return VerificationCheck(

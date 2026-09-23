@@ -5,6 +5,10 @@ from __future__ import annotations
 import struct
 
 CANONICAL_VERSION: int = 2
+LEGACY_CANONICAL_VERSION: int = 0
+"""The legacy canonical version admitted alongside `CANONICAL_VERSION`: records registered through the older
+Forensics Lab path. No preimage is built for it; this verifier implements no version-0 canonical preimage,
+so a legacy record's manifest and collection checks report not-recomputable or not-performed, never passed."""
 _MAX_FIELD = 0xFFFF
 
 

@@ -1,8 +1,10 @@
 namespace Xio.Parallax.Client.Verification.Models;
 
-/// <summary>What admitting a record's verification block decoded: its content hash, and its public key when that is a usable 32-byte key.</summary>
+/// <summary>What admitting a record's verification block decoded: its content hash, its public key when that is a usable 32-byte key,
+/// and whether the record declares the legacy canonical version 0, whose manifest and collection preimages this verifier does not implement.</summary>
 internal sealed record RecordAdmissionResult(ReadOnlyMemory<byte> ContentHash,
-                                             ReadOnlyMemory<byte>? PublicKey);
+                                             ReadOnlyMemory<byte>? PublicKey,
+                                             bool IsLegacy);
 
 /// <summary>Asks for the two image-hash checks.</summary>
 internal sealed record XioImageHashCheckRequest(PublishedRecordResponse Record,

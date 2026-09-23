@@ -15,10 +15,16 @@ internal sealed class ManifestChecker(IVerificationEncoding _encoding,
     {
         ArgumentNullException.ThrowIfNull(request);
         var manifest = request.Manifest;
-        var manifestHash = _encoding.TryHex(manifest.Hash);
         var label = manifest.Type ?? $"#{request.Index}";
-        var hashCheck = CheckHash(manifest, VerificationConstants.ManifestHashCheckPrefix + label, manifestHash);
+        var hashName = VerificationConstants.ManifestHashCheckPrefix + label;
         var signatureName = VerificationConstants.ManifestSignatureCheckPrefix + label;
+        if (request.Admission.IsLegacy)
+        {
+            return new ManifestCheckResult(LegacyCheck(hashName, manifest.Hash), LegacyCheck(signatureName, manifest.Signature), null);
+        }
+
+        var manifestHash = _encoding.TryHex(manifest.Hash);
+        var hashCheck = CheckHash(manifest, hashName, manifestHash);
         if (manifest.Type is null || manifestHash is null)
         {
             var unbuildable = new VerificationCheck(signatureName, VerificationOutcome.Failed, "The manifest declares no type or no hex hash, so its preimage cannot be built.");
@@ -28,6 +34,15 @@ internal sealed class ManifestChecker(IVerificationEncoding _encoding,
         var preimage = _preimageBuilder.Manifest(new XioManifestPreimageRequest(request.Admission.ContentHash, manifest.Type, manifestHash));
         var signatureCheck = _signatureChecker.Check(new XioSignatureCheckRequest(signatureName, request.Admission.PublicKey, preimage, manifest.Signature));
         return new ManifestCheckResult(hashCheck, signatureCheck, new CanonicalManifestEntry(manifest.Type, manifestHash));
+    }
+
+    /// <summary>A legacy (canonical version 0) manifest's hash or signature check: this verifier implements no version-0 canonical
+    /// preimage, so the declared value, if any, cannot be recomputed; it is never reported as passed.</summary>
+    private static VerificationCheck LegacyCheck(string name, string? declaredValue)
+    {
+        return string.IsNullOrEmpty(declaredValue)
+            ? new VerificationCheck(name, VerificationOutcome.NotRecomputable, VerificationConstants.LegacyManifestValueAbsentDetail)
+            : new VerificationCheck(name, VerificationOutcome.NotRecomputable, VerificationConstants.LegacyManifestHashingUnimplementedDetail);
     }
 
     private VerificationCheck CheckHash(PublishedRecordResponse_manifests manifest, string name, byte[]? manifestHash)

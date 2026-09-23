@@ -216,6 +216,55 @@ public sealed class AttributionVerifierTests
         Assert.Throws<VerificationRefusedException>(() => VerifyUnder(SignedRecordFactory.Create(_pki), null!));
     }
 
+    [Fact]
+    public void A_legacy_canonical_version_0_record_passes_the_image_signature_and_chain_but_never_the_manifest_or_collection()
+    {
+        var report = Verify(SignedRecordFactory.CreateLegacy(_pki), null);
+
+        Assert.False(report.AnyFailed);
+        Assert.True(report.AllPerformedPassed);
+        Assert.False(report.AllPassed);
+        string[] mustPass = ["originalImageHash", "imageSignature", "leafKeyMatchesPublicKey", "certificateChain"];
+        Assert.All(mustPass, name => Assert.Equal(VerificationOutcome.Passed, Outcome(report, name)));
+        Assert.Equal(VerificationOutcome.NotPerformed, Outcome(report, "contentHash"));
+        Assert.Equal(VerificationOutcome.NotRecomputable, Outcome(report, "manifestHash:c2pa"));
+        Assert.Equal(VerificationOutcome.NotRecomputable, Outcome(report, "manifestSignature:c2pa"));
+        Assert.Equal(VerificationOutcome.NotPerformed, Outcome(report, "collectionSignature"));
+    }
+
+    [Fact]
+    public void A_legacy_record_with_a_tampered_image_signature_byte_fails()
+    {
+        var record = SignedRecordFactory.CreateLegacy(_pki);
+        var signature = Convert.FromBase64String(record.Verification!.Signature!);
+        signature[0] ^= 0x01;
+        record.Verification.Signature = Convert.ToBase64String(signature);
+
+        var report = Verify(record, null);
+
+        Assert.Equal(VerificationOutcome.Failed, Outcome(report, "imageSignature"));
+    }
+
+    [Fact]
+    public void A_legacy_record_declaring_a_canonical_version_1_is_still_refused()
+    {
+        var record = SignedRecordFactory.CreateLegacy(_pki);
+        record.Verification!.CanonicalVersion = 1;
+
+        Assert.Throws<VerificationRefusedException>(() => Verify(record, null));
+    }
+
+    [Fact]
+    public void A_legacy_record_carrying_a_collection_signature_is_not_recomputable_never_passed()
+    {
+        var record = SignedRecordFactory.CreateLegacy(_pki);
+        record.Verification!.CollectionSignature = record.Verification.Signature;
+
+        var report = Verify(record, null);
+
+        Assert.Equal(VerificationOutcome.NotRecomputable, Outcome(report, "collectionSignature"));
+    }
+
     private VerificationReport Verify(PublishedRecordResponse record, byte[]? originalBytes)
     {
         ReadOnlyMemory<byte>? bytes = originalBytes is null ? (ReadOnlyMemory<byte>?)null : originalBytes;

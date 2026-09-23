@@ -23,9 +23,20 @@ from xio_parallax_client.verification import (
     VerificationRefused,
 )
 
-from .verification_support import JUMBF_BYTES, ORIGINAL, Fixture, _ca, _chain_record, _leaf_for, _pem, _verify, fixture
+from .verification_support import (
+    JUMBF_BYTES,
+    ORIGINAL,
+    Fixture,
+    _ca,
+    _chain_record,
+    _leaf_for,
+    _pem,
+    _verify,
+    fixture,
+    legacy_fixture,
+)
 
-__all__ = ["fixture"]
+__all__ = ["fixture", "legacy_fixture"]
 
 
 def test_all_performed_checks_pass(fixture: Fixture) -> None:
@@ -236,3 +247,49 @@ def test_verifies_nested_manifest_dict_shape_with_c2pa_form(fixture: Fixture) ->
     report = AttributionVerifier(TrustRoots.from_pem([_pem(fixture.root)])).verify(record)
     assert report.passed("manifestHash:c2pa")
     assert report.all_performed_passed
+
+
+def test_legacy_canonical_version_0_manifest_and_collection_are_never_passed(legacy_fixture: Fixture) -> None:
+    """A canonical version 0 record: this verifier implements no version-0 canonical preimage, so the
+    manifest and collection checks are NOT_RECOMPUTABLE / NOT_PERFORMED; the image signature, leaf key
+    and chain checks are unaffected and must pass."""
+    report = _verify(legacy_fixture, original=None)
+
+    assert not report.any_failed
+    assert report.all_performed_passed
+    for name in ("originalImageHash", "imageSignature", "leafKeyMatchesPublicKey", "certificateChain"):
+        assert report.outcome(name) is CheckOutcome.PASSED, (name, report.outcome(name))
+    assert report.outcome("contentHash") is CheckOutcome.NOT_PERFORMED
+    assert report.outcome("manifestHash:c2pa") is CheckOutcome.NOT_RECOMPUTABLE
+    assert report.outcome("manifestSignature:c2pa") is CheckOutcome.NOT_RECOMPUTABLE
+    assert report.outcome("collectionSignature") is CheckOutcome.NOT_PERFORMED
+
+
+def test_legacy_record_with_tampered_image_signature_fails(legacy_fixture: Fixture) -> None:
+    record = copy.deepcopy(legacy_fixture.record)
+    signature = bytearray(base64.b64decode(record["verification"]["signature"], validate=True))
+    signature[0] ^= 0x01
+    record["verification"]["signature"] = base64.b64encode(bytes(signature)).decode("ascii")
+
+    report = _verify(legacy_fixture, record, original=None)
+
+    assert report.outcome("imageSignature") is CheckOutcome.FAILED
+
+
+def test_legacy_record_declaring_canonical_version_1_is_still_refused(legacy_fixture: Fixture) -> None:
+    record = copy.deepcopy(legacy_fixture.record)
+    record["verification"]["canonicalVersion"] = 1
+
+    with pytest.raises(VerificationRefused):
+        _verify(legacy_fixture, record, original=None)
+
+
+def test_legacy_record_carrying_a_collection_signature_is_not_recomputable_never_passed(
+    legacy_fixture: Fixture,
+) -> None:
+    record = copy.deepcopy(legacy_fixture.record)
+    record["verification"]["collectionSignature"] = record["verification"]["signature"]
+
+    report = _verify(legacy_fixture, record, original=None)
+
+    assert report.outcome("collectionSignature") is CheckOutcome.NOT_RECOMPUTABLE

@@ -1,6 +1,8 @@
 namespace Xio.Parallax.Client.Tests.Verification.Support;
 
-/// <summary>Builds a published record signed per canonical version 2 by a <see cref="TestPki"/> leaf: a JUMBF-form <c>c2pa</c> manifest and a JSON-form <c>xi-manifest</c>.</summary>
+/// <summary>Builds a published record signed by a <see cref="TestPki"/> leaf: <see cref="Create"/> for canonical version 2 (a
+/// JUMBF-form <c>c2pa</c> manifest and a JSON-form <c>xi-manifest</c>), <see cref="CreateLegacy"/> for the legacy canonical
+/// version 0 shape a production Forensics Lab registration declares.</summary>
 internal static class SignedRecordFactory
 {
     /// <summary>The original image bytes the record attests.</summary>
@@ -63,6 +65,47 @@ internal static class SignedRecordFactory
                 CertificateChain = [pki.RootPem],
                 TrustContext = "test",
                 TrustVersion = 1,
+            },
+        };
+    }
+
+    /// <summary>Builds a legacy (canonical version 0) record shaped like a production Forensics Lab registration:
+    /// a single JUMBF-form <c>c2pa</c> manifest declaring no hash or signature, an upper-case hex <c>contentHash</c>,
+    /// and no collection signature. The image signature is still Ed25519 over the content hash bytes alone, so it
+    /// is signed the same way a canonical version 2 record's is.</summary>
+    internal static PublishedRecordResponse CreateLegacy(TestPki pki)
+    {
+        var contentHash = Blake3Digest(ImageBytes);
+        var key = pki.LeafKeys.Private;
+
+        var c2pa = new PublishedRecordResponse_manifests
+        {
+            Type = "c2pa",
+            Form = PublishedRecordResponse_manifests_form.Jumbf,
+            Payload = new UntypedString(Convert.ToBase64String(C2paBytes)),
+            Hash = null,
+            Signature = null,
+        };
+
+        return new PublishedRecordResponse
+        {
+            OriginalImageHash = Convert.ToHexStringLower(contentHash),
+            Outcome = PublishedRecordOutcome.Published,
+            Manifests = [c2pa],
+            Verification = new PublishedRecordVerification
+            {
+                CanonicalVersion = 0,
+                ContentHash = Convert.ToHexString(contentHash),
+                HashAlgorithm = "blake3-256",
+                SignatureAlgorithm = "ed25519",
+                SignedAtUtc = SignedAt,
+                PublicKey = ToBase64Url(pki.LeafPublicKey),
+                Signature = Sign(key, Preimages.Image(contentHash)),
+                CollectionSignature = null,
+                LeafCertificate = pki.LeafPem,
+                CertificateChain = [pki.RootPem],
+                TrustContext = "xi-forensics-v1",
+                TrustVersion = 0,
             },
         };
     }

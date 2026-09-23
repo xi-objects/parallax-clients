@@ -23,6 +23,7 @@ from xio_parallax_client.verification import AttributionVerifier, CheckOutcome, 
 
 _FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "record"
 _LOOKUP_FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "lookup"
+_LEGACY_FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "record-legacy"
 
 _EXPECTED_PASSED = (
     "originalImageHash",
@@ -142,3 +143,66 @@ def test_tampered_c2pa_payload_byte_fails_manifest_hash() -> None:
 def test_fixture_files_exist(fixture_name: str) -> None:
     """Guard: the fixture directory carries every file these tests read."""
     assert (_FIXTURE_DIR / fixture_name).is_file()
+
+
+def _legacy_record() -> dict[str, Any]:
+    return json.loads((_LEGACY_FIXTURE_DIR / "record.json").read_text(encoding="utf-8"))
+
+
+def test_legacy_record_verifies_with_every_performed_check_passed() -> None:
+    """A real production record registered through the older Forensics Lab path
+    (`fixtures/record-legacy/record.json`): `canonicalVersion: 0`, `hashAlgorithm: "blake3-256"`
+    (lower-case), `contentHash` in upper-case hex, a single `c2pa` manifest with `hash: null` and
+    `signature: null`, and no `collectionSignature`. Captured 2026-09-23 from
+    `https://<production-forensics-lab-host>/api/attribution/records`.
+    The chain ends at `CN=Institute of Provenance Root CA`, which `fixtures/record/orbital-info.json`'s
+    dev root does not carry, so the roots here were fetched from production Orbital's own `/info`
+    instead (`fixtures/record-legacy/orbital-info.json`).
+    """
+    roots = TrustRoots.from_pem_file(_LEGACY_FIXTURE_DIR / "root.pem")
+    report = AttributionVerifier(roots).verify(_legacy_record(), None)
+
+    assert not report.any_failed
+    assert report.all_performed_passed
+    for name in ("originalImageHash", "imageSignature", "leafKeyMatchesPublicKey", "certificateChain"):
+        assert report.outcome(name) is CheckOutcome.PASSED, (name, report.outcome(name))
+    assert report.outcome("contentHash") is CheckOutcome.NOT_PERFORMED
+    assert report.outcome("manifestHash:c2pa") is CheckOutcome.NOT_RECOMPUTABLE
+    assert report.outcome("manifestSignature:c2pa") is CheckOutcome.NOT_RECOMPUTABLE
+    assert report.outcome("collectionSignature") is CheckOutcome.NOT_PERFORMED
+
+
+def test_legacy_record_from_orbital_pinned_root_matches_root_pem_file() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            content=(_LEGACY_FIXTURE_DIR / "orbital-info.json").read_bytes(),
+            headers={"content-type": "application/json"},
+        )
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        orbital_roots = TrustRoots.from_orbital("https://orbital.example", client=client)
+
+    file_roots = TrustRoots.from_pem_file(_LEGACY_FIXTURE_DIR / "root.pem")
+    der = serialization.Encoding.DER
+    assert orbital_roots.certificates[0].public_bytes(der) == file_roots.certificates[0].public_bytes(der)
+
+    report = AttributionVerifier(orbital_roots).verify(_legacy_record(), None)
+    assert report.outcome("certificateChain") is CheckOutcome.PASSED
+
+
+def test_legacy_record_tampered_image_signature_fails() -> None:
+    record = _legacy_record()
+    signature = bytearray(base64.b64decode(record["verification"]["signature"], validate=True))
+    signature[0] ^= 0x01
+    record["verification"]["signature"] = base64.b64encode(bytes(signature)).decode("ascii")
+
+    roots = TrustRoots.from_pem_file(_LEGACY_FIXTURE_DIR / "root.pem")
+    report = AttributionVerifier(roots).verify(record, None)
+    assert report.outcome("imageSignature") is CheckOutcome.FAILED
+
+
+@pytest.mark.parametrize("fixture_name", ["root.pem", "orbital-info.json", "record.json"])
+def test_legacy_fixture_files_exist(fixture_name: str) -> None:
+    """Guard: the legacy fixture directory carries every file these tests read."""
+    assert (_LEGACY_FIXTURE_DIR / fixture_name).is_file()

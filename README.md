@@ -85,7 +85,11 @@ report = AttributionVerifier(TrustRoots.from_orbital(orbital_url)).verify(record
 bytes, when you have them), `manifestHash:<kind>`, `manifestSignature:<kind>`,
 `collectionSignature`, `imageSignature`, `leafKeyMatchesPublicKey`, `certificateChain`. A
 JSON-form manifest's hash is reported as not recomputable, never as passed; an unknown hash
-algorithm, canonical version or an empty root list is a refusal, never a skipped check. The roots
+algorithm, canonical version or an empty root list is a refusal, never a skipped check.
+`canonicalVersion` 0 is admitted alongside 2, for records registered through the older Forensics
+Lab path: since this verifier implements no version-0 canonical preimage, that record's manifest
+and collection-signature checks report not-recomputable or not-performed, never passed, while the
+image signature, leaf key and certificate chain checks are unaffected. The roots
 come from Orbital's anonymous `GET /info` (`pinnedRoots`), fetched once over TLS and pinned, or
 from a PEM file. Both verifiers carry a conformance test over a real record captured from the
 API's own e2e stack (`fixtures/record/`), and every performed check passes on it.

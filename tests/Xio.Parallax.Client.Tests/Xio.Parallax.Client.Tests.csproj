@@ -8,6 +8,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="../../fixtures/record/*" LinkBase="fixtures/record" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../fixtures/record-legacy/*" LinkBase="fixtures/record-legacy" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../../fixtures/lookup/*" LinkBase="fixtures/lookup" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>

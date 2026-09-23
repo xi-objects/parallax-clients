@@ -5,7 +5,7 @@ public interface IAttributionVerifier
 {
     /// <summary>Verifies a published record.</summary>
     /// <returns>The verdict of every check.</returns>
-    /// <exception cref="VerificationRefusedException">No roots, no verification block, an unimplemented hash or signature algorithm, a canonical version other than 2, or a content hash that is not a BLAKE3-256 hex digest.</exception>
+    /// <exception cref="VerificationRefusedException">No roots, no verification block, an unimplemented hash or signature algorithm, a canonical version other than 0 (legacy) or 2, or a content hash that is not a BLAKE3-256 hex digest.</exception>
     VerificationReport Verify(XioVerifyRecordRequest request);
 }
 
@@ -96,6 +96,13 @@ public sealed class AttributionVerifier : IAttributionVerifier
 
     private VerificationCheck CollectionSignatureCheck(bool collectable, int manifestCount, RecordAdmissionResult admission, PublishedRecordVerification verification, List<CanonicalManifestEntry> entries)
     {
+        if (admission.IsLegacy)
+        {
+            return string.IsNullOrEmpty(verification.CollectionSignature)
+                ? new VerificationCheck(VerificationConstants.CollectionSignatureCheck, VerificationOutcome.NotPerformed, VerificationConstants.LegacyCollectionSignatureAbsentDetail)
+                : new VerificationCheck(VerificationConstants.CollectionSignatureCheck, VerificationOutcome.NotRecomputable, VerificationConstants.LegacyCollectionHashingUnimplementedDetail);
+        }
+
         if (!collectable)
         {
             return new VerificationCheck(VerificationConstants.CollectionSignatureCheck, VerificationOutcome.Failed, "A manifest declares no type or no hex hash, so the collection preimage cannot be built.");
