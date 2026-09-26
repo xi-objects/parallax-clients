@@ -94,40 +94,79 @@ come from Orbital's anonymous `GET /info` (`pinnedRoots`), fetched once over TLS
 from a PEM file. Both verifiers carry a conformance test over a real record captured from the
 API's own e2e stack (`fixtures/record/`), and every performed check passes on it.
 
-## Embedded C2PA
+## Embedded JUMBF and C2PA
 
-The client, never the API, looks inside a file. `detect_embedded_c2pa` / `EmbeddedC2paDetector`
-locates the C2PA manifest store in a JPEG (APP11), PNG (`caBX`), WebP (`C2PA`) or classic TIFF
-(tag 0xCD41) carrier and lists its JUMBF boxes so you can see what it is; an unrecognised carrier
-is reported as unsupported, never as "no C2PA". Attaching is your call: `as_manifest_part` /
-`C2paAttachment.AsManifestPart` turns the store into the `manifest[c2pa]` part you pass to
-`register`. On the finder's side, `compare_with_record` / `C2paRecordComparer` compares the
-found file's store with the recovered record by BLAKE3 of the bytes: `MATCH`, `MISMATCH`,
-`ABSENT_FROM_RECORD` or `NOT_PUBLISHED`. Nothing decodes the claims or validates the C2PA
-signature; the API treats a manifest as opaque bytes and so does the client.
+The client, never the API, looks inside a file. REST validates that a manifest is well-formed
+JUMBF; it never requires that JUMBF be C2PA, so every well-formed store is shown, not just C2PA's
+own. `detect_embedded_c2pa` / `EmbeddedC2paDetector` recognises a file's carrier by its signature
+and extracts every embedded JUMBF manifest store — a JPEG's APP11 segments can carry several box
+instances, in document order; PNG (`caBX`), WebP (`C2PA` chunk) and classic TIFF (tag 0xCD41)
+carry at most one — and classifies each: the C2PA manifest-store UUID and the label `c2pa` make it
+kind `c2pa` (sent as `application/c2pa`), every other well-formed store is kind `jumbf` (sent as
+`application/jumbf`); classification never refuses. The result's outcome is `FOUND`, `ABSENT`,
+`MALFORMED` or `UNSUPPORTED`: a malformed instance, or two stores of one kind, is `MALFORMED`
+naming the count; a supported carrier with no store is `ABSENT`; an unrecognised carrier is
+`UNSUPPORTED`, never "no C2PA".
+
+Inclusion is your selection, per image: a `ManifestSelection` says whether to include the
+embedded store(s) and lists the sidecars beside it, each a JSON manifest under its own kind or a
+JUMBF manifest classified from its own bytes. `ManifestResolver` / `resolve_manifests` resolves
+every image of a collection before anything is sent, returning one registration item per image or
+refusing them all.
+
+```csharp
+var requests = images.Select(image => new ManifestRequest(image,
+    new ManifestSelection(IncludeEmbedded: true, [SidecarManifest.Json("meta.json", "xi-manifest", jsonBytes)])))
+    .ToList();
+try
+{
+    var items = new ManifestResolver().Resolve(requests);
+}
+catch (ManifestRefusalException refused)
+{
+    foreach (var refusal in refused.Refusals)
+    {
+        Console.Error.WriteLine($"{refusal.FileName}: {refusal.Reason}");
+    }
+}
+```
 
 ```python
-from xio_parallax_client import detect_embedded_c2pa, as_manifest_part, compare_with_record
-
-found = detect_embedded_c2pa(image.data)
-if found.store is not None:
-    for box in found.store.boxes:
-        print(box.depth * "  ", box.type, box.label, box.length)
-    registered = client.register(image, [as_manifest_part(found.store)])   # explicit
-    record = client.wait_for_record(registered.original_image_hash, wait)
-    print(compare_with_record(found.store, record).outcome)                # MATCH
+requests = [ManifestRequest(image, ManifestSelection(include_embedded=True,
+                            sidecars=[SidecarManifest.json("meta.json", "xi-manifest", json_bytes)]))
+            for image in images]
+try:
+    items = resolve_manifests(requests)
+except ManifestRefusalError as refused:
+    for refusal in refused.refusals:
+        print(refusal.file_name, refusal.reason)
 ```
+
+The conflict rule: when an image carries an embedded store and a JUMBF sidecar is offered, the two
+must be byte-identical — with several of either, the two sets must match exactly; identical bytes
+are one manifest, included once, and anything else refuses. Whenever the embedded content matters
+(inclusion requested, or any JUMBF sidecar given), a malformed store refuses, an unrecognised
+carrier refuses since the client never skips the check, and a supported carrier with no store
+simply contributes nothing. Two manifests of one kind on one image refuse, and a JSON sidecar
+never conflicts with an embedded store.
+
+On the finder's side, `compare_with_record` / `C2paRecordComparer` compares each detected store
+with the recovered record by BLAKE3 of the bytes, one outcome per store: `MATCH`, `MISMATCH`,
+`ABSENT_FROM_RECORD` or `NOT_PUBLISHED`. Nothing decodes the claims or validates a C2PA signature;
+the API and the client both treat a manifest as opaque bytes.
 
 ## Examples
 
 `examples/dotnet/GettingStarted` and `examples/python/getting_started.py` walk the docs'
 sequence; `examples/dotnet/RegisterBatch` and `examples/python/register_batch.py` register a
-folder through one slot conversation and look it up through another;
-`examples/dotnet/C2paRoundTrip` and `examples/python/c2pa_round_trip.py` detect an embedded
-store, attach it on request, and compare the found file with the recovered record. Each reads its
-inputs from environment variables named in its header; `.env.example` names them all, and a git-ignored
-`.env` holds your values. All of them have been run against the API's own e2e stack and against
-production, with the roots pinned from the live Orbital's `/info`.
+folder through one slot conversation, each image's manifests resolved from its `<image>.json`
+(kind `xi-manifest`), `<image>.c2pa` and `<image>.jumbf` sidecars and, on request, its embedded
+store(s), then look it up through another; `examples/dotnet/C2paRoundTrip` and
+`examples/python/c2pa_round_trip.py` detect the embedded store(s), include them on request, and
+compare the found file with the recovered record. Each reads its inputs from environment
+variables named in its header, including `PARALLAX_INCLUDE_EMBEDDED`; `.env.example` names them
+all, and a git-ignored `.env` holds your values. All of them have been run against the API's own
+e2e stack and against production, with the roots pinned from the live Orbital's `/info`.
 
 ## Building
 

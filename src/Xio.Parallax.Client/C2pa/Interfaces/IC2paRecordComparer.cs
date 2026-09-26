@@ -1,6 +1,6 @@
 namespace Xio.Parallax.Client.C2pa.Interfaces;
 
-/// <summary>Compares an embedded C2PA store with a recovered record's jumbf-form manifests, by bytes.</summary>
+/// <summary>Compares an embedded JUMBF manifest store with a recovered record's jumbf-form manifests, by bytes.</summary>
 public interface IC2paRecordComparer
 {
     /// <summary>Compares the BLAKE3-256 of the store bytes with the declared hash of each jumbf-form manifest of the record.</summary>

@@ -1,48 +1,40 @@
-// Detects the C2PA manifest store embedded in an image, shows it, attaches it explicitly on
-// registration, then plays the finder: extracts the store from the file again and compares it with
-// the recovered record.
+// Detects every JUMBF manifest store embedded in an image, shows each with its classified kind (c2pa
+// or jumbf), includes them explicitly on registration when asked, then plays the finder: detects the
+// stores in the file again and compares each with the recovered record.
 //
 // Environment:
-//   PARALLAX_BASE_URL              the API's base URL (defaults to https://api.parallax.xiobjects.com)
-//   PARALLAX_TOKEN                 the account token (required)
-//   PARALLAX_IMAGE                 path of the image (required); JPEG, PNG, WebP or TIFF carriers
-//   PARALLAX_IMAGE_TYPE            its media type (required)
-//   PARALLAX_ATTACH_EMBEDDED_C2PA  "yes" to attach the detected store as manifest[c2pa]; anything
-//                                  else registers without it (the registrant decides, never the client)
+//   PARALLAX_BASE_URL          the API's base URL (defaults to https://api.parallax.xiobjects.com)
+//   PARALLAX_TOKEN             the account token (required)
+//   PARALLAX_IMAGE             path of the image (required); JPEG, PNG, WebP or TIFF carriers
+//   PARALLAX_IMAGE_TYPE        its media type (required)
+//   PARALLAX_INCLUDE_EMBEDDED  "yes" to include the embedded store(s), each as manifest[<kind>];
+//                              anything else registers without them (the registrant decides, never the client)
 //
 // Run from the repository root: dotnet run --project examples/dotnet/C2paRoundTrip
 
 var image = ImageUpload.FromFile(Required("PARALLAX_IMAGE"), Required("PARALLAX_IMAGE_TYPE"));
 var detector = new EmbeddedC2paDetector();
 var detected = detector.Detect(image.Bytes);
-if (detected.Carrier == C2paCarrier.Unsupported)
+if (detected.Outcome != EmbeddedC2paOutcome.Found)
 {
-    Console.Error.WriteLine($"unsupported carrier: {detected.Detail}");
+    Console.Error.WriteLine($"{detected.Carrier}: {detected.Outcome} ({detected.Detail})");
     return 1;
 }
 
-if (detected.Store is null)
+foreach (var store in detected.Stores)
 {
-    Console.Error.WriteLine($"{detected.Carrier}: no embedded C2PA manifest store ({detected.Detail})");
-    return 1;
+    Console.WriteLine($"{detected.Carrier}: embedded {store.Kind} store of {store.Bytes.Length} bytes:");
+    foreach (var box in store.Boxes)
+    {
+        Console.WriteLine($"  {new string(' ', box.Depth * 2)}{box.Type} label={box.Label ?? "-"} length={box.Length}");
+    }
 }
 
-Console.WriteLine($"{detected.Carrier}: embedded C2PA store of {detected.Store.Bytes.Length} bytes:");
-foreach (var box in detected.Store.Boxes)
-{
-    Console.WriteLine($"  {new string(' ', box.Depth * 2)}{box.Type} label={box.Label ?? "-"} length={box.Length}");
-}
-
-var manifests = new List<ManifestPart>();
-if (string.Equals(Environment.GetEnvironmentVariable("PARALLAX_ATTACH_EMBEDDED_C2PA"), "yes", StringComparison.OrdinalIgnoreCase))
-{
-    manifests.Add(C2paAttachment.AsManifestPart(detected.Store));
-    Console.WriteLine("attaching it as manifest[c2pa]");
-}
-else
-{
-    Console.WriteLine("not attaching it (set PARALLAX_ATTACH_EMBEDDED_C2PA=yes to attach)");
-}
+var includeEmbedded = string.Equals(Environment.GetEnvironmentVariable("PARALLAX_INCLUDE_EMBEDDED"), "yes", StringComparison.OrdinalIgnoreCase);
+var manifests = new ManifestResolver().Resolve(image, new ManifestSelection(includeEmbedded, []));
+Console.WriteLine(includeEmbedded
+    ? $"including {string.Join(", ", manifests.Select(manifest => $"manifest[{manifest.Kind}]"))}"
+    : "not including them (set PARALLAX_INCLUDE_EMBEDDED=yes to include)");
 
 var baseUrl = Environment.GetEnvironmentVariable("PARALLAX_BASE_URL");
 using var client = new ParallaxClient(new ParallaxClientOptions
@@ -58,16 +50,20 @@ var record = await client.WaitForRecordAsync(
     new RecordWaitOptions(TimeSpan.FromSeconds(2), TimeSpan.FromMinutes(2)));
 Console.WriteLine($"record outcome: {record.Outcome}");
 
-// The finder's side: the same detection on the file that was found, compared with the record.
+// The finder's side: the same detection on the file that was found, each store compared with the record.
 var found = detector.Detect(image.Bytes);
-if (found.Store is null)
+if (found.Outcome != EmbeddedC2paOutcome.Found)
 {
-    Console.Error.WriteLine("the found file carries no store to compare");
+    Console.Error.WriteLine($"the found file carries no store to compare ({found.Outcome}: {found.Detail})");
     return 1;
 }
 
-var comparison = new C2paRecordComparer().Compare(found.Store, record);
-Console.WriteLine($"comparison: {comparison.Outcome} kind={comparison.MatchedKind ?? "-"} - {comparison.Detail}");
+var comparer = new C2paRecordComparer();
+foreach (var store in found.Stores)
+{
+    var comparison = comparer.Compare(store, record);
+    Console.WriteLine($"comparison of the {store.Kind} store: {comparison.Outcome} kind={comparison.MatchedKind ?? "-"} - {comparison.Detail}");
+}
 
 await client.UnregisterAsync(registered.Id!.Value);
 Console.WriteLine($"taken down: {registered.Id}");

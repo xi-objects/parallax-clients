@@ -61,15 +61,27 @@ public sealed class C2paRecordComparerTests
     }
 
     [Fact]
-    public void AsManifestPart_yields_kind_c2pa_form_c2pa_and_the_store_bytes()
+    public void AsManifestPart_of_a_c2pa_store_yields_kind_c2pa_form_c2pa_and_the_store_bytes()
     {
-        var store = new EmbeddedC2paDetector().Detect(TestCarriers.Png(("caBX", TestCarriers.SyntheticStore()))).Store!;
+        var store = new EmbeddedC2paDetector().Detect(TestCarriers.Png(("caBX", TestCarriers.SyntheticStore()))).Stores.Single();
 
         var part = C2paAttachment.AsManifestPart(store);
 
         Assert.Equal("c2pa", part.Kind);
         Assert.Equal(ManifestForm.C2pa, part.Form);
         Assert.Equal(store.Bytes.ToArray(), part.Bytes.ToArray());
+    }
+
+    [Fact]
+    public void AsManifestPart_of_a_jumbf_store_yields_kind_jumbf_form_jumbf()
+    {
+        var other = TestCarriers.OtherStore(TestCarriers.ManifestUuid, "xi");
+        var store = new EmbeddedC2paDetector().Detect(TestCarriers.Png(("caBX", other))).Stores.Single();
+
+        var part = C2paAttachment.AsManifestPart(store);
+
+        Assert.Equal("jumbf", part.Kind);
+        Assert.Equal(ManifestForm.Jumbf, part.Form);
     }
 
     [FixtureFact("record")]
@@ -80,15 +92,16 @@ public sealed class C2paRecordComparerTests
         var result = new EmbeddedC2paDetector().Detect(await LoadImageBytesAsync());
 
         Assert.Equal(C2paCarrier.Png, result.Carrier);
-        Assert.NotNull(result.Store);
-        Assert.Equal(expectedStore, result.Store.Bytes.ToArray());
+        var store = Assert.Single(result.Stores);
+        Assert.Equal("c2pa", store.Kind);
+        Assert.Equal(expectedStore, store.Bytes.ToArray());
         JumbfBoxSummary[] expectedBoxes =
         [
             new("jumb", "c2pa", 0, expectedStore.Length),
             new("jumd", "c2pa", 1, 30),
             new("json", null, 1, expectedStore.Length - 38),
         ];
-        Assert.Equal(expectedBoxes, result.Store.Boxes);
+        Assert.Equal(expectedBoxes, store.Boxes);
     }
 
     [FixtureFact("record")]
@@ -109,7 +122,7 @@ public sealed class C2paRecordComparerTests
         var tampered = store.Bytes.ToArray();
         tampered[^1] ^= 0x01;
 
-        var comparison = _comparer.Compare(new EmbeddedC2paStore(tampered, store.Boxes), await LoadRecordAsync());
+        var comparison = _comparer.Compare(new EmbeddedC2paStore(store.Kind, tampered, store.Boxes), await LoadRecordAsync());
 
         Assert.Equal(C2paComparisonOutcome.Mismatch, comparison.Outcome);
         Assert.Null(comparison.MatchedKind);
@@ -127,13 +140,13 @@ public sealed class C2paRecordComparerTests
 
     private static EmbeddedC2paStore StoreOf(byte[] bytes)
     {
-        return new EmbeddedC2paStore(bytes, []);
+        return new EmbeddedC2paStore("c2pa", bytes, []);
     }
 
     private static async Task<EmbeddedC2paStore> DetectRealStoreAsync()
     {
-        return new EmbeddedC2paDetector().Detect(await LoadImageBytesAsync()).Store
-            ?? throw new InvalidOperationException("image.png did not yield an embedded C2PA store.");
+        return new EmbeddedC2paDetector().Detect(await LoadImageBytesAsync()).Stores.SingleOrDefault()
+            ?? throw new InvalidOperationException("image.png did not yield an embedded manifest store.");
     }
 
     private static Task<byte[]> LoadImageBytesAsync()

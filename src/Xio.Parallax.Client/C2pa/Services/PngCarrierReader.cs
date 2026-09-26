@@ -1,6 +1,6 @@
 namespace Xio.Parallax.Client.C2pa.Services;
 
-/// <summary>Extracts a C2PA store from a PNG's caBX chunk, whose data is the whole superbox.</summary>
+/// <summary>Extracts the JUMBF manifest store from a PNG's caBX chunk, whose data is the whole superbox.</summary>
 internal sealed class PngCarrierReader : ICarrierReader
 {
     private const int ChunkHeaderLength = 8;
@@ -51,7 +51,7 @@ internal sealed class PngCarrierReader : ICarrierReader
         }
 
         return store is null
-            ? new CarrierExtraction(null, "The PNG carries no caBX chunk, so no C2PA store.")
-            : new CarrierExtraction(store, "A C2PA store from the PNG's caBX chunk.");
+            ? new CarrierExtraction([], "The PNG carries no caBX chunk, so no embedded manifest store.")
+            : new CarrierExtraction([store.Value], "A JUMBF manifest store from the PNG's caBX chunk.");
     }
 }

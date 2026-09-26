@@ -22,6 +22,15 @@ MultipartFile = tuple[str | None, bytes, str]
 MultipartPart = tuple[str, MultipartFile]
 
 
+def validate_manifest_kind(kind: str) -> None:
+    """Raise `ValueError` unless `kind` matches `^[A-Za-z0-9._-]{1,64}$`, the server's rule for a manifest kind."""
+    if not _KIND_PATTERN.match(kind):
+        raise ValueError(
+            f"manifest kind {kind!r} must match {_KIND_PATTERN.pattern} (1-64 characters "
+            "of A-Z, a-z, 0-9, '.', '_' or '-')"
+        )
+
+
 class ManifestForm(Enum):
     """The form a manifest's stored bytes are carried in, and the content type that declares it."""
 
@@ -48,11 +57,7 @@ class ManifestPart:
     data: bytes
 
     def __post_init__(self) -> None:
-        if not _KIND_PATTERN.match(self.kind):
-            raise ValueError(
-                f"manifest kind {self.kind!r} must match {_KIND_PATTERN.pattern} (1-64 characters "
-                "of A-Z, a-z, 0-9, '.', '_' or '-')"
-            )
+        validate_manifest_kind(self.kind)
 
 
 @dataclass(frozen=True, slots=True)

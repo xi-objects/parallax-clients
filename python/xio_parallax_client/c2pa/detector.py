@@ -1,27 +1,29 @@
-"""Detection of an embedded C2PA manifest store: identify the carrier, extract the store, show its boxes.
+"""Detection of embedded JUMBF manifest stores: identify the carrier, extract each store, walk and classify it.
 
-REST never inspects a file's content; the client does. What is found is shown, and attaching it to a
-registration is the caller's explicit choice through `as_manifest_part`.
+REST never inspects a file's content; the client does. Each well-formed store is classified `c2pa` (its
+description carries the C2PA manifest-store UUID and label) or `jumbf` (any other). What is found is
+shown, and including it in a registration is the caller's explicit choice, through `as_manifest_part`
+or a `ManifestSelection`.
 """
 
 from __future__ import annotations
 
 import struct
+from collections import Counter
 from collections.abc import Callable
 
 from ..multipart import ManifestForm, ManifestPart
 from .carriers import PNG_SIGNATURE, CarrierError, extract_jpeg, extract_png, extract_tiff, extract_webp
-from .jumbf import JumbfError, read_c2pa_store
-from .models import C2paCarrier, EmbeddedC2paResult, EmbeddedC2paStore
+from .jumbf import C2PA_KIND, JUMBF_KIND, JumbfError, classify_store, read_store
+from .models import C2paCarrier, EmbeddedC2paOutcome, EmbeddedC2paResult, EmbeddedC2paStore
 
-#: The manifest kind an embedded C2PA store is attached under.
-C2PA_MANIFEST_KIND = "c2pa"
+__all__ = ["C2PA_KIND", "JUMBF_KIND", "as_manifest_part", "detect_embedded_c2pa", "jumbf_part"]
 
-_Extractor = Callable[[bytes], bytes | None]
+_Extractor = Callable[[bytes], list[bytes]]
 
 
 def _identify(data: bytes) -> tuple[C2paCarrier, _Extractor | None, str]:
-    """Match the file signature to a carrier; anything unrecognised is UNSUPPORTED, never 'no C2PA'."""
+    """Match the file signature to a carrier; anything unrecognised is UNSUPPORTED, never 'no store'."""
     if data.startswith(b"\xff\xd8\xff"):
         return C2paCarrier.JPEG, extract_jpeg, ""
     if data.startswith(PNG_SIGNATURE):
@@ -31,36 +33,55 @@ def _identify(data: bytes) -> tuple[C2paCarrier, _Extractor | None, str]:
     if data[:4] in (b"II*\x00", b"MM\x00*"):
         return C2paCarrier.TIFF, extract_tiff, ""
     if data[:4] in (b"II+\x00", b"MM\x00+"):
-        return C2paCarrier.UNSUPPORTED, None, "BigTIFF is not a supported C2PA carrier; nothing was looked for"
-    return C2paCarrier.UNSUPPORTED, None, "unrecognised file signature; whether it carries C2PA is not known"
+        return C2paCarrier.UNSUPPORTED, None, "BigTIFF is not a supported carrier; nothing was looked for"
+    return C2paCarrier.UNSUPPORTED, None, "unrecognised file signature; whether it carries a store is not known"
+
+
+def _malformed(carrier: C2paCarrier, reason: str) -> EmbeddedC2paResult:
+    """A MALFORMED result whose detail starts `malformed <CARRIER>:` and names what is wrong."""
+    return EmbeddedC2paResult(carrier, EmbeddedC2paOutcome.MALFORMED, [], f"malformed {carrier.name}: {reason}")
 
 
 def detect_embedded_c2pa(data: bytes) -> EmbeddedC2paResult:
-    """Detect a C2PA manifest store embedded in `data` (JPEG APP11, PNG caBX, WebP C2PA, TIFF tag 0xCD41).
+    """Detect the JUMBF manifest stores embedded in `data` (JPEG APP11, PNG caBX, WebP C2PA, TIFF tag 0xCD41).
 
-    `store` is None when the carrier is supported and holds no store, or when what the carrier holds
-    is not a single well-formed `jumb` box described by the C2PA manifest-store UUID (the `detail`
-    then starts `malformed <CARRIER>:` and names what is wrong; there is no pass-through of malformed
-    bytes). An unrecognised format is `C2paCarrier.UNSUPPORTED`, never 'no C2PA'.
+    Each store is walked and classified `c2pa` or `jumbf`; the outcome is FOUND with every store in
+    document order. A store the walk refuses, or two stores of one kind, is MALFORMED (there is no
+    pass-through of malformed bytes and nothing picks between two); a supported carrier with no store
+    is ABSENT; an unrecognised format is UNSUPPORTED, never 'no store'.
     """
     carrier, extractor, refusal = _identify(data)
     if extractor is None:
-        return EmbeddedC2paResult(carrier=carrier, store=None, detail=refusal)
+        return EmbeddedC2paResult(carrier, EmbeddedC2paOutcome.UNSUPPORTED, [], refusal)
     try:
-        raw = extractor(data)
+        raws = extractor(data)
     except (CarrierError, IndexError, struct.error) as exc:
-        reason = str(exc) if isinstance(exc, CarrierError) else "the file is truncated"
-        return EmbeddedC2paResult(carrier=carrier, store=None, detail=f"malformed {carrier.name}: {reason}")
-    if raw is None:
-        return EmbeddedC2paResult(carrier=carrier, store=None, detail=f"{carrier.name} carries no C2PA manifest store")
-    try:
-        boxes = read_c2pa_store(raw)
-    except JumbfError as exc:
-        return EmbeddedC2paResult(carrier=carrier, store=None, detail=f"malformed {carrier.name}: {exc}")
-    detail = f"C2PA manifest store of {len(raw)} bytes in {len(boxes)} JUMBF boxes"
-    return EmbeddedC2paResult(carrier=carrier, store=EmbeddedC2paStore(data=raw, boxes=boxes), detail=detail)
+        return _malformed(carrier, str(exc) if isinstance(exc, CarrierError) else "the file is truncated")
+    if not raws:
+        detail = f"{carrier.name} carries no embedded JUMBF manifest store"
+        return EmbeddedC2paResult(carrier, EmbeddedC2paOutcome.ABSENT, [], detail)
+    stores: list[EmbeddedC2paStore] = []
+    for index, raw in enumerate(raws, start=1):
+        try:
+            boxes = read_store(raw)
+            stores.append(EmbeddedC2paStore(data=raw, kind=classify_store(raw), boxes=boxes))
+        except JumbfError as exc:
+            return _malformed(carrier, f"embedded store {index} of {len(raws)}: {exc}")
+    for kind, count in Counter(store.kind for store in stores).items():
+        if count > 1:
+            reason = f"{count} embedded manifest stores classify as kind {kind!r}; one kind carries one manifest"
+            return _malformed(carrier, reason)
+    detail = "; ".join(
+        f"{store.kind} manifest store of {len(store.data)} bytes in {len(store.boxes)} JUMBF boxes" for store in stores
+    )
+    return EmbeddedC2paResult(carrier, EmbeddedC2paOutcome.FOUND, stores, detail)
+
+
+def jumbf_part(kind: str, data: bytes) -> ManifestPart:
+    """A classified JUMBF store as a `manifest[<kind>]` part: form C2PA for kind `c2pa`, else form JUMBF."""
+    return ManifestPart(kind, ManifestForm.C2PA if kind == C2PA_KIND else ManifestForm.JUMBF, data)
 
 
 def as_manifest_part(store: EmbeddedC2paStore) -> ManifestPart:
-    """Wrap a detected store as a `manifest[c2pa]` part; the caller attaches it explicitly, nothing does it for them."""
-    return ManifestPart(C2PA_MANIFEST_KIND, ManifestForm.C2PA, store.data)
+    """Wrap a detected store as a `manifest[<kind>]` part; the caller includes it explicitly, nothing else does."""
+    return jumbf_part(store.kind, store.data)

@@ -1,4 +1,4 @@
-"""Test helpers: a synthetic C2PA manifest store and the carriers (JPEG, PNG, WebP, TIFF) that embed it."""
+"""Test helpers: synthetic JUMBF manifest stores and the carriers (JPEG, PNG, WebP, TIFF) that embed them."""
 
 from __future__ import annotations
 
@@ -31,20 +31,44 @@ def synthetic_store() -> bytes:
     return superbox(C2PA_UUID, "c2pa", manifest)
 
 
+def other_store(label: str = "not-c2pa") -> bytes:
+    """A well-formed JUMBF store whose description is not the C2PA manifest store's: kind `jumbf`."""
+    return superbox(CBOR_UUID, label, box(b"cbor", bytes([0xA0]) * 8))
+
+
 def _segment(marker: int, payload: bytes) -> bytes:
     """One JPEG marker segment with its big-endian length."""
     return bytes([0xFF, marker]) + struct.pack(">H", len(payload) + 2) + payload
 
 
-def jpeg(store: bytes | None, pieces: int = 3, order: list[int] | None = None) -> bytes:
-    """A minimal JPEG: SOI, APP0, the store split across APP11 segments (in `order` of Z), SOS stub, EOI."""
+def _app11_instance(store: bytes, en: int, pieces: int, order: list[int] | None) -> bytes:
+    """One box instance `en` split across APP11 segments, emitted in `order` of Z."""
+    header, body = store[:8], store[8:]
+    size = -(-len(body) // pieces)
+    chunks = [body[i * size : (i + 1) * size] for i in range(pieces)]
+    return b"".join(
+        _segment(0xEB, b"JP" + struct.pack(">HI", en, z) + header + chunks[z - 1])
+        for z in order or list(range(1, pieces + 1))
+    )
+
+
+def jpeg(
+    store: bytes | None,
+    pieces: int = 3,
+    order: list[int] | None = None,
+    extra: tuple[bytes, ...] = (),
+    first_en: int = 1,
+) -> bytes:
+    """A minimal JPEG: SOI, APP0, the store split across APP11 segments (in `order` of Z), SOS stub, EOI.
+
+    The store is box instance `first_en`; each of `extra` follows as a further instance (En 2, 3, ...)
+    in two segments.
+    """
     out = bytes([0xFF, 0xD8]) + _segment(0xE0, b"JFIF" + bytes([0, 1, 1, 0, 0, 1, 0, 1, 0, 0]))
     if store is not None:
-        header, body = store[:8], store[8:]
-        size = -(-len(body) // pieces)
-        chunks = [body[i * size : (i + 1) * size] for i in range(pieces)]
-        for z in order or list(range(1, pieces + 1)):
-            out += _segment(0xEB, b"JP" + struct.pack(">HI", 1, z) + header + chunks[z - 1])
+        out += _app11_instance(store, first_en, pieces, order)
+    for en, instance in enumerate(extra, start=2):
+        out += _app11_instance(instance, en, 2, None)
     return out + _segment(0xDA, bytes([1, 1, 0, 0, 0x3F, 0])) + bytes([0, 0xFF, 0xD9])
 
 

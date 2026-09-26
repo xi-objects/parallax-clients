@@ -1,6 +1,6 @@
 namespace Xio.Parallax.Client.C2pa.Services;
 
-/// <summary>Reads JUMBF (ISO/IEC 19566-5) box headers and walks a C2PA manifest store's box tree without parsing its contents.</summary>
+/// <summary>Reads JUMBF (ISO/IEC 19566-5) box headers and walks a JUMBF manifest store's box tree without parsing its contents, and classifies it c2pa or jumbf.</summary>
 internal sealed class JumbfStoreReader : IJumbfStoreReader
 {
     private const int BasicHeaderLength = 8;
@@ -36,22 +36,32 @@ internal sealed class JumbfStoreReader : IJumbfStoreReader
         return new JumbfBoxHeader(type, offset, offset + BasicHeaderLength, End(type, offset, limit, declared, BasicHeaderLength));
     }
 
-    public bool IsC2paStore(ReadOnlySpan<byte> superbox)
+    public IReadOnlyList<JumbfBoxSummary> Summarise(ReadOnlySpan<byte> superbox)
     {
-        try
-        {
-            var header = ReadHeader(superbox, 0, superbox.Length);
-            return header.Type == C2paConstants.SuperboxType
-                && header.End == superbox.Length
-                && DescribesC2paStore(superbox, header);
-        }
-        catch (C2paFormatException)
-        {
-            return false;
-        }
+        var header = ReadSuperbox(superbox);
+        var boxes = new List<JumbfBoxSummary>();
+        Walk(superbox, header, 0, boxes);
+        return boxes;
     }
 
-    public IReadOnlyList<JumbfBoxSummary> Summarise(ReadOnlySpan<byte> superbox)
+    public string Classify(ReadOnlySpan<byte> superbox)
+    {
+        var header = ReadSuperbox(superbox);
+        var description = ReadHeader(superbox, header.PayloadStart, header.End);
+        if (description.Type != C2paConstants.DescriptionType)
+        {
+            throw new C2paFormatException($"The jumb box at offset {header.Start} opens with a '{description.Type}' box, not a jumd description box.");
+        }
+
+        var payload = superbox[description.PayloadStart..description.End];
+        var carriesStoreUuid = payload.Length >= C2paConstants.JumdUuidLength
+            && payload[..C2paConstants.JumdUuidLength].SequenceEqual(C2paConstants.C2paStoreUuid);
+        return carriesStoreUuid && ReadLabel(payload, description.Start) == C2paConstants.C2paStoreLabel
+            ? C2paConstants.C2paKind
+            : C2paConstants.JumbfKind;
+    }
+
+    private JumbfBoxHeader ReadSuperbox(ReadOnlySpan<byte> superbox)
     {
         var header = ReadHeader(superbox, 0, superbox.Length);
         if (header.Type != C2paConstants.SuperboxType)
@@ -64,14 +74,7 @@ internal sealed class JumbfStoreReader : IJumbfStoreReader
             throw new C2paFormatException($"The jumb superbox declares {header.End} bytes but {superbox.Length} were embedded.");
         }
 
-        if (!DescribesC2paStore(superbox, header))
-        {
-            throw new C2paFormatException("The jumb superbox's description box does not carry the C2PA manifest-store UUID.");
-        }
-
-        var boxes = new List<JumbfBoxSummary>();
-        Walk(superbox, header, 0, boxes);
-        return boxes;
+        return header;
     }
 
     private static int End(string type, int offset, int limit, ulong declared, int headerLength)
@@ -82,15 +85,6 @@ internal sealed class JumbfStoreReader : IJumbfStoreReader
         }
 
         return offset + (int)declared;
-    }
-
-    private bool DescribesC2paStore(ReadOnlySpan<byte> buffer, JumbfBoxHeader superbox)
-    {
-        var description = ReadHeader(buffer, superbox.PayloadStart, superbox.End);
-        var payload = buffer[description.PayloadStart..description.End];
-        return description.Type == C2paConstants.DescriptionType
-            && payload.Length >= C2paConstants.JumdUuidLength
-            && payload[..C2paConstants.JumdUuidLength].SequenceEqual(C2paConstants.C2paStoreUuid);
     }
 
     private void Walk(ReadOnlySpan<byte> buffer, JumbfBoxHeader box, int depth, List<JumbfBoxSummary> boxes)

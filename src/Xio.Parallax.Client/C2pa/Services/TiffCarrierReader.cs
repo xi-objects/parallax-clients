@@ -1,6 +1,6 @@
 namespace Xio.Parallax.Client.C2pa.Services;
 
-/// <summary>Extracts a C2PA store from tag 52545 (UNDEFINED) of a classic TIFF's top-level IFD chain, which also covers DNG.</summary>
+/// <summary>Extracts the JUMBF manifest store from tag 52545 (UNDEFINED) of a classic TIFF's top-level IFD chain, which also covers DNG.</summary>
 internal sealed class TiffCarrierReader : ICarrierReader
 {
     private const int HeaderLength = 8;
@@ -43,8 +43,8 @@ internal sealed class TiffCarrierReader : ICarrierReader
         }
 
         return store is null
-            ? new CarrierExtraction(null, "The TIFF carries no tag 52545, so no C2PA store.")
-            : new CarrierExtraction(store, "A C2PA store from the TIFF's tag 52545.");
+            ? new CarrierExtraction([], "The TIFF carries no tag 52545, so no embedded manifest store.")
+            : new CarrierExtraction([store.Value], "A JUMBF manifest store from the TIFF's tag 52545.");
     }
 
     private static ReadOnlyMemory<byte>? ReadIfd(ReadOnlyMemory<byte> file, uint ifd, bool littleEndian, out uint next)

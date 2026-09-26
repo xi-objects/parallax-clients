@@ -1,14 +1,14 @@
-"""Detects the C2PA manifest store embedded in an image, shows it, attaches it explicitly on
-registration, then plays the finder: extracts the store from the file again and compares it with
-the recovered record.
+"""Detects the JUMBF manifest store(s) embedded in an image, shows each with its classified kind
+(`c2pa` or `jumbf`), includes them explicitly on registration when asked, then plays the finder:
+detects the stores in the file again and compares each with the recovered record.
 
 Environment:
-  PARALLAX_BASE_URL              the API's base URL (defaults to https://api.parallax.xiobjects.com)
-  PARALLAX_TOKEN                 the account token (required)
-  PARALLAX_IMAGE                 path of the image (required); JPEG, PNG, WebP or TIFF carriers
-  PARALLAX_IMAGE_TYPE            its media type (required)
-  PARALLAX_ATTACH_EMBEDDED_C2PA  "yes" to attach the detected store as manifest[c2pa]; anything
-                                 else registers without it (the registrant decides, never the client)
+  PARALLAX_BASE_URL          the API's base URL (defaults to https://api.parallax.xiobjects.com)
+  PARALLAX_TOKEN             the account token (required)
+  PARALLAX_IMAGE             path of the image (required); JPEG, PNG, WebP or TIFF carriers
+  PARALLAX_IMAGE_TYPE        its media type (required)
+  PARALLAX_INCLUDE_EMBEDDED  "yes" to include the detected store(s), each as manifest[<kind>]; anything
+                             else registers without them (the registrant decides, never the client)
 
 Run from the repository root: uv run python examples/python/c2pa_round_trip.py
 """
@@ -19,14 +19,17 @@ import os
 import sys
 
 from xio_parallax_client import (
-    C2paCarrier,
+    NO_MANIFESTS,
+    EmbeddedC2paOutcome,
     ImageUpload,
+    ManifestRefusalError,
+    ManifestSelection,
     ParallaxClient,
     ParallaxClientOptions,
     RecordWaitOptions,
-    as_manifest_part,
     compare_with_record,
     detect_embedded_c2pa,
+    resolve_image_manifests,
 )
 
 
@@ -39,23 +42,26 @@ def required(name: str) -> str:
 
 
 def main() -> None:
-    """Detects, shows, attaches on request, registers, recovers and compares."""
+    """Detects, shows, includes on request, registers, recovers and compares each store."""
     image = ImageUpload.from_file(required("PARALLAX_IMAGE"), required("PARALLAX_IMAGE_TYPE"))
     detected = detect_embedded_c2pa(image.data)
-    if detected.carrier is C2paCarrier.UNSUPPORTED:
-        sys.exit(f"unsupported carrier: {detected.detail}")
-    if detected.store is None:
-        sys.exit(f"{detected.carrier.name}: no embedded C2PA manifest store ({detected.detail})")
-    print(f"{detected.carrier.name}: embedded C2PA store of {len(detected.store.data)} bytes:")
-    for b in detected.store.boxes:
-        print(f"  {'  ' * b.depth}{b.type} label={b.label!r} length={b.length}")
+    if detected.outcome is not EmbeddedC2paOutcome.FOUND:
+        sys.exit(f"{detected.carrier.name}: {detected.outcome.name.lower()} ({detected.detail})")
+    for store in detected.stores:
+        print(f"{detected.carrier.name}: embedded {store.kind} manifest store of {len(store.data)} bytes:")
+        for b in store.boxes:
+            print(f"  {'  ' * b.depth}{b.type} label={b.label!r} length={b.length}")
 
-    manifests = []
-    if os.environ.get("PARALLAX_ATTACH_EMBEDDED_C2PA", "").lower() == "yes":
-        manifests.append(as_manifest_part(detected.store))
-        print("attaching it as manifest[c2pa]")
+    include = os.environ.get("PARALLAX_INCLUDE_EMBEDDED", "").lower() == "yes"
+    selection = ManifestSelection(include_embedded=True) if include else NO_MANIFESTS
+    try:
+        manifests = resolve_image_manifests(image, selection)
+    except ManifestRefusalError as refused:
+        sys.exit(str(refused))
+    if manifests:
+        print("including", ", ".join(f"manifest[{m.kind}]" for m in manifests))
     else:
-        print("not attaching it (set PARALLAX_ATTACH_EMBEDDED_C2PA=yes to attach)")
+        print("not including them (set PARALLAX_INCLUDE_EMBEDDED=yes to include)")
 
     client = ParallaxClient(
         ParallaxClientOptions(
@@ -75,10 +81,11 @@ def main() -> None:
 
     # The finder's side: the same detection on the file that was found, compared with the record.
     found = detect_embedded_c2pa(image.data)
-    if found.store is None:
-        sys.exit("the found file carries no store to compare")
-    comparison = compare_with_record(found.store, record)
-    print(f"comparison: {comparison.outcome.name} kind={comparison.matched_kind!r} - {comparison.detail}")
+    if found.outcome is not EmbeddedC2paOutcome.FOUND:
+        sys.exit(f"the found file carries no store to compare ({found.detail})")
+    for store in found.stores:
+        comparison = compare_with_record(store, record)
+        print(f"{store.kind}: {comparison.outcome.name} kind={comparison.matched_kind!r} - {comparison.detail}")
 
     client.unregister(str(registered.id))
     print("taken down:", registered.id)

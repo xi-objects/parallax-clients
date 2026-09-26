@@ -1,10 +1,10 @@
 namespace Xio.Parallax.Client.C2pa.Interfaces;
 
-/// <summary>Detects a C2PA manifest store embedded in an image file's bytes.</summary>
+/// <summary>Detects the JUMBF manifest stores embedded in an image file's bytes, each classified c2pa or jumbf.</summary>
 public interface IEmbeddedC2paDetector
 {
-    /// <summary>Recognises the file's carrier by its signature and extracts its embedded C2PA store.</summary>
+    /// <summary>Recognises the file's carrier by its signature and extracts and classifies every embedded JUMBF manifest store.</summary>
     /// <param name="file">The whole file's bytes.</param>
-    /// <returns>The carrier, the store when one is embedded and well formed, and a description of the finding.</returns>
+    /// <returns>The carrier, the outcome, every well-formed store in document order when found, and a description of the finding.</returns>
     EmbeddedC2paResult Detect(ReadOnlyMemory<byte> file);
 }

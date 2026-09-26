@@ -1,4 +1,9 @@
-"""The JUMBF (ISO/IEC 19566-5) box grammar, enough to walk a C2PA manifest store without parsing its CBOR."""
+"""The JUMBF (ISO/IEC 19566-5) box grammar, enough to walk a manifest store without parsing its CBOR.
+
+The walk decides only well-formedness (box headers, lengths within their container, a `jumb` opening
+with a `jumd`, bounded nesting); REST validates JUMBF itself. The C2PA manifest-store UUID and label
+classify a well-formed store as kind `c2pa`; any other well-formed store is kind `jumbf`. Neither refuses.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +16,10 @@ from .models import JumbfBoxSummary
 C2PA_STORE_UUID = bytes.fromhex("6332706100110010800000AA00389B71")
 #: The label a C2PA manifest store's description box carries.
 C2PA_STORE_LABEL = "c2pa"
+#: The manifest kind of a store whose description carries the C2PA manifest-store UUID and label.
+C2PA_KIND = "c2pa"
+#: The manifest kind of any other well-formed JUMBF store.
+JUMBF_KIND = "jumbf"
 
 _LABEL_TOGGLE = 0x02
 _UUID_LENGTH = 16
@@ -58,7 +67,7 @@ def read_box_header(data: bytes, offset: int, limit: int) -> BoxHeader:
 
 
 def parse_description(data: bytes, start: int, end: int) -> Description:
-    """Parse a `jumd` payload: UUID, toggles, then the optional NUL-terminated label."""
+    """Parse a `jumd` payload: UUID, toggles, then the optional NUL-terminated label (invalid UTF-8 is replaced)."""
     if end - start < _UUID_LENGTH + 1:
         raise JumbfError(f"jumd box at offset {start} is shorter than its UUID and toggles")
     uuid = data[start : start + _UUID_LENGTH]
@@ -69,10 +78,7 @@ def parse_description(data: bytes, start: int, end: int) -> Description:
         terminator = data.find(b"\x00", label_start, end)
         if terminator < 0:
             raise JumbfError(f"jumd box at offset {start} declares a label with no NUL terminator")
-        try:
-            label = data[label_start:terminator].decode("utf-8")
-        except UnicodeDecodeError as exc:
-            raise JumbfError(f"jumd box at offset {start} carries a label that is not UTF-8") from exc
+        label = data[label_start:terminator].decode("utf-8", errors="replace")
     return Description(uuid=uuid, label=label)
 
 
@@ -104,14 +110,21 @@ def _first_description(data: bytes, superbox: BoxHeader) -> Description:
     return parse_description(data, child.payload_start, child.end)
 
 
-def walk_superbox(data: bytes) -> list[JumbfBoxSummary]:
-    """Walk `data` as exactly one `jumb` superbox and return every box in it, depth first.
-
-    Raises `JumbfError` when the bytes are not one well-formed `jumb` box.
-    """
+def _superbox_header(data: bytes) -> BoxHeader:
+    """The header of the box `data` opens with, which must be a `jumb` superbox."""
     header = read_box_header(data, 0, len(data))
     if header.type != "jumb":
         raise JumbfError(f"the data is a {header.type!r} box, not a jumb superbox")
+    return header
+
+
+def read_store(data: bytes) -> list[JumbfBoxSummary]:
+    """Walk `data` as exactly one `jumb` superbox and return every box in it, depth first.
+
+    Raises `JumbfError` when the bytes are not one well-formed `jumb` box; what the box describes is
+    not checked here (`classify_store` says which kind it is).
+    """
+    header = _superbox_header(data)
     if header.end != len(data):
         raise JumbfError(f"the jumb box is {header.end} bytes but the data runs {len(data)} bytes")
     boxes: list[JumbfBoxSummary] = []
@@ -119,28 +132,15 @@ def walk_superbox(data: bytes) -> list[JumbfBoxSummary]:
     return boxes
 
 
-def is_c2pa_store(data: bytes) -> bool:
-    """Whether `data` is a `jumb` superbox described by the C2PA manifest-store UUID and label."""
-    try:
-        header = read_box_header(data, 0, len(data))
-        if header.type != "jumb":
-            return False
-        description = _first_description(data, header)
-    except JumbfError:
-        return False
-    return description.uuid == C2PA_STORE_UUID and description.label == C2PA_STORE_LABEL
+def classify_store(data: bytes) -> str:
+    """The manifest kind of a `jumb` superbox, which classifies and never refuses a well-formed store.
 
+    `C2PA_KIND` when its description carries the C2PA manifest-store UUID and label, else `JUMBF_KIND`.
 
-def read_c2pa_store(data: bytes) -> list[JumbfBoxSummary]:
-    """Walk `data` as one `jumb` box described by the C2PA manifest-store UUID and label.
-
-    Raises `JumbfError` when the bytes are not one well-formed `jumb` box, or when its `jumd`
-    description does not carry the C2PA manifest-store UUID and label; there is no pass-through.
+    Raises `JumbfError` when the bytes do not open with a `jumb` box described by a `jumd` box.
     """
-    boxes = walk_superbox(data)
-    if not is_c2pa_store(data):
-        raise JumbfError(
-            f"the jumb box's description does not carry the C2PA manifest-store UUID "
-            f"({C2PA_STORE_UUID.hex()}) and label {C2PA_STORE_LABEL!r}"
-        )
-    return boxes
+    header = _superbox_header(data)
+    description = _first_description(data, header)
+    if description.uuid == C2PA_STORE_UUID and description.label == C2PA_STORE_LABEL:
+        return C2PA_KIND
+    return JUMBF_KIND

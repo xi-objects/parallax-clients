@@ -26,6 +26,12 @@ internal static class TestCarriers
         return Box("jumb", Description(StoreUuid, "c2pa"), manifest);
     }
 
+    /// <summary>A store of another kind: jumb[jumd with the given UUID and label, json "{}"].</summary>
+    internal static byte[] OtherStore(byte[] uuid, string label)
+    {
+        return Box("jumb", Description(uuid, label), Box("json", "{}"u8.ToArray()));
+    }
+
     /// <summary>A box: its LBox (big-endian, header included), its TBox and its payload parts.</summary>
     internal static byte[] Box(string type, params byte[][] payload)
     {

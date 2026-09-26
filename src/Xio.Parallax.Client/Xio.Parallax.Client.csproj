@@ -6,7 +6,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <IsPackable>true</IsPackable>
     <PackageId>Xio.Parallax.Client</PackageId>
-    <Version>0.2.2</Version>
+    <Version>0.3.0</Version>
     <Authors>XI Objects</Authors>
     <Company>XI Objects</Company>
     <Description>.NET client for the XI Parallax REST API: image registration, look-up, published records and attribution verification.</Description>

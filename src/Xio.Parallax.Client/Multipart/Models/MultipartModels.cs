@@ -42,7 +42,10 @@ public sealed record ManifestPart(string Kind,
     /// <summary>The manifest's kind, validated against ^[A-Za-z0-9._-]{1,64}$.</summary>
     public string Kind { get; } = ValidateKind(Kind);
 
-    private static string ValidateKind(string kind)
+    /// <summary>Returns the kind when it matches ^[A-Za-z0-9._-]{1,64}$, else refuses it; the one check every manifest kind goes through.</summary>
+    /// <param name="kind">The kind to validate.</param>
+    /// <returns>The kind, unchanged.</returns>
+    internal static string ValidateKind(string kind)
     {
         ArgumentNullException.ThrowIfNull(kind);
         if (!KindPattern.IsMatch(kind))
