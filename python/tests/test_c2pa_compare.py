@@ -21,7 +21,7 @@ from .carriers import synthetic_store
 
 _FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "record"
 
-pytestmark = pytest.mark.skipif(
+_requires_fixture = pytest.mark.skipif(
     not _FIXTURE_DIR.is_dir(),
     reason="fixtures/record is not present: a local capture, not part of the repository",
 )
@@ -73,6 +73,7 @@ def test_not_published_when_the_outcome_is_not_published() -> None:
     assert comparison.outcome is C2paComparisonOutcome.NOT_PUBLISHED
 
 
+@_requires_fixture
 def test_generated_model_record_compares_like_its_dict() -> None:
     stored, record = _fixture()
     comparison = compare_with_record(EmbeddedC2paStore(data=stored), PublishedRecordResponse.from_dict(record))
@@ -80,6 +81,7 @@ def test_generated_model_record_compares_like_its_dict() -> None:
     assert comparison.matched_kind == "c2pa"
 
 
+@_requires_fixture
 def test_fixture_round_trip_finds_and_matches_the_store_embedded_in_the_image() -> None:
     """The genuine finder flow: `image.png` itself carries the store, in its `caBX` chunk."""
     stored, record = _fixture()
@@ -95,6 +97,7 @@ def test_fixture_round_trip_finds_and_matches_the_store_embedded_in_the_image() 
     assert comparison.matched_kind == "c2pa"
 
 
+@_requires_fixture
 def test_fixture_round_trip_a_flipped_byte_mismatches() -> None:
     stored, record = _fixture()
     flipped = bytearray(stored)

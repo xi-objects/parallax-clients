@@ -16,7 +16,7 @@
 .PARAMETER FeedUrl
     The Azure DevOps Artifacts feed's nuget v3 index URL. Required; there is no default feed, so
     the script stops naming this parameter when it is left out. The feed's own name is derived
-    from the URL's package-source path segment, so it is never taken as a separate parameter.
+    from the URL's '_packaging/<name>/' segment, so it is never taken as a separate parameter.
 
 .PARAMETER Version
     SemVer to stamp on the package. Defaults to the value in the csproj.
@@ -64,12 +64,9 @@ if ($FeedUrl -eq "") {
     exit 1
 }
 
-# The feed source path is split across two literals so this file never carries the segment as one
-# contiguous word; the pattern it builds still matches the URL's real package-source path.
-$packagingSegment = "_pack" + "aging"
-$feedNameMatch = [regex]::Match($FeedUrl, "$packagingSegment/([^/]+)/")
+$feedNameMatch = [regex]::Match($FeedUrl, "_packaging/([^/]+)/")
 if (-not $feedNameMatch.Success) {
-    Write-Error "Could not derive a feed name from -FeedUrl '$FeedUrl': expected a package-source path segment naming the feed."
+    Write-Error "Could not derive a feed name from -FeedUrl '$FeedUrl': expected a '_packaging/<name>/' segment."
     exit 1
 }
 

@@ -25,9 +25,17 @@ _FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "record"
 _LOOKUP_FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "lookup"
 _LEGACY_FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "record-legacy"
 
-pytestmark = pytest.mark.skipif(
-    not _FIXTURE_DIR.is_dir() or not _LOOKUP_FIXTURE_DIR.is_dir() or not _LEGACY_FIXTURE_DIR.is_dir(),
-    reason="fixtures/record, fixtures/lookup or fixtures/record-legacy is not present: a local capture, not part of the repository",
+_requires_record = pytest.mark.skipif(
+    not _FIXTURE_DIR.is_dir(),
+    reason="fixtures/record is not present: a local capture, not part of the repository",
+)
+_requires_lookup = pytest.mark.skipif(
+    not _LOOKUP_FIXTURE_DIR.is_dir() or not _FIXTURE_DIR.is_dir(),
+    reason="fixtures/lookup or fixtures/record is not present: a local capture, not part of the repository",
+)
+_requires_legacy = pytest.mark.skipif(
+    not _LEGACY_FIXTURE_DIR.is_dir(),
+    reason="fixtures/record-legacy is not present: a local capture, not part of the repository",
 )
 
 _EXPECTED_PASSED = (
@@ -76,6 +84,7 @@ def _wrong_root() -> x509.Certificate:
     )
 
 
+@_requires_record
 def test_real_record_verifies_with_no_failed_check() -> None:
     """Every check the verifier performs on the real, unmodified record passes."""
     roots = TrustRoots.from_pem_file(_FIXTURE_DIR / "root.pem")
@@ -86,6 +95,7 @@ def test_real_record_verifies_with_no_failed_check() -> None:
     assert report.outcome("manifestHash:xi-manifest") is CheckOutcome.NOT_RECOMPUTABLE
 
 
+@_requires_lookup
 def test_lookup_record_no_manifests_collection_signature_not_performed() -> None:
     """A production record from a registration with no manifests (`fixtures/lookup/record.json`):
     `collectionSignature` is NOT_PERFORMED, not FAILED, since there is no collection to sign. This
@@ -105,6 +115,7 @@ def test_lookup_record_no_manifests_collection_signature_not_performed() -> None
     assert [c.name for c in report.checks if c.outcome is CheckOutcome.FAILED] == ["certificateChain"]
 
 
+@_requires_record
 def test_from_orbital_pinned_root_matches_root_pem_file() -> None:
     """`from_orbital`'s parsed root is the same certificate as `root.pem`, and it passes the chain check."""
 
@@ -124,6 +135,7 @@ def test_from_orbital_pinned_root_matches_root_pem_file() -> None:
     assert report.outcome("certificateChain") is CheckOutcome.PASSED
 
 
+@_requires_record
 def test_wrong_pinned_root_fails_certificate_chain() -> None:
     """A root unrelated to the fixture's chain fails `certificateChain` on the real record."""
     roots = TrustRoots.from_pem([_wrong_root().public_bytes(serialization.Encoding.PEM).decode("ascii")])
@@ -131,6 +143,7 @@ def test_wrong_pinned_root_fails_certificate_chain() -> None:
     assert report.outcome("certificateChain") is CheckOutcome.FAILED
 
 
+@_requires_record
 def test_tampered_c2pa_payload_byte_fails_manifest_hash() -> None:
     """Flipping one byte of the stored c2pa payload fails `manifestHash:c2pa`."""
     record = _record()
@@ -144,6 +157,7 @@ def test_tampered_c2pa_payload_byte_fails_manifest_hash() -> None:
     assert report.outcome("manifestHash:c2pa") is CheckOutcome.FAILED
 
 
+@_requires_record
 @pytest.mark.parametrize("fixture_name", ["root.pem", "orbital-info.json", "record.json", "image.png"])
 def test_fixture_files_exist(fixture_name: str) -> None:
     """Guard: the fixture directory carries every file these tests read."""
@@ -154,6 +168,7 @@ def _legacy_record() -> dict[str, Any]:
     return json.loads((_LEGACY_FIXTURE_DIR / "record.json").read_text(encoding="utf-8"))
 
 
+@_requires_legacy
 def test_legacy_record_verifies_with_every_performed_check_passed() -> None:
     """A real production record registered through the older Forensics Lab path
     (`fixtures/record-legacy/record.json`): `canonicalVersion: 0`, `hashAlgorithm: "blake3-256"`
@@ -177,6 +192,7 @@ def test_legacy_record_verifies_with_every_performed_check_passed() -> None:
     assert report.outcome("collectionSignature") is CheckOutcome.NOT_PERFORMED
 
 
+@_requires_legacy
 def test_legacy_record_from_orbital_pinned_root_matches_root_pem_file() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
@@ -196,6 +212,7 @@ def test_legacy_record_from_orbital_pinned_root_matches_root_pem_file() -> None:
     assert report.outcome("certificateChain") is CheckOutcome.PASSED
 
 
+@_requires_legacy
 def test_legacy_record_tampered_image_signature_fails() -> None:
     record = _legacy_record()
     signature = bytearray(base64.b64decode(record["verification"]["signature"], validate=True))
@@ -207,6 +224,7 @@ def test_legacy_record_tampered_image_signature_fails() -> None:
     assert report.outcome("imageSignature") is CheckOutcome.FAILED
 
 
+@_requires_legacy
 @pytest.mark.parametrize("fixture_name", ["root.pem", "orbital-info.json", "record.json"])
 def test_legacy_fixture_files_exist(fixture_name: str) -> None:
     """Guard: the legacy fixture directory carries every file these tests read."""

@@ -7,7 +7,7 @@ public sealed class C2paRecordComparerTests
     private readonly IC2paRecordComparer _comparer = new C2paRecordComparer();
     private readonly TestPki _pki = TestPki.Create();
 
-    [FixtureFact("record")]
+    [Fact]
     public void A_store_whose_blake3_is_a_jumbf_manifest_hash_matches_that_manifest()
     {
         var comparison = _comparer.Compare(StoreOf(SignedRecordFactory.C2paBytes), SignedRecordFactory.Create(_pki));
@@ -16,7 +16,7 @@ public sealed class C2paRecordComparerTests
         Assert.Equal("c2pa", comparison.MatchedKind);
     }
 
-    [FixtureFact("record")]
+    [Fact]
     public void A_store_no_jumbf_manifest_hashes_to_is_a_mismatch()
     {
         var comparison = _comparer.Compare(StoreOf(TestCarriers.SyntheticStore()), SignedRecordFactory.Create(_pki));
@@ -25,7 +25,7 @@ public sealed class C2paRecordComparerTests
         Assert.Null(comparison.MatchedKind);
     }
 
-    [FixtureFact("record")]
+    [Fact]
     public void A_record_with_no_jumbf_form_manifest_is_absent_from_record()
     {
         var record = SignedRecordFactory.Create(_pki);
@@ -36,7 +36,7 @@ public sealed class C2paRecordComparerTests
         Assert.Equal(C2paComparisonOutcome.AbsentFromRecord, comparison.Outcome);
     }
 
-    [FixtureFact("record")]
+    [Fact]
     public void A_json_form_manifest_whose_hash_equals_the_store_is_never_compared()
     {
         var record = SignedRecordFactory.Create(_pki);
@@ -49,7 +49,7 @@ public sealed class C2paRecordComparerTests
         Assert.Equal(C2paComparisonOutcome.AbsentFromRecord, comparison.Outcome);
     }
 
-    [FixtureFact("record")]
+    [Fact]
     public void A_record_that_is_not_published_is_not_published()
     {
         var record = SignedRecordFactory.Create(_pki);
@@ -60,7 +60,7 @@ public sealed class C2paRecordComparerTests
         Assert.Equal(C2paComparisonOutcome.NotPublished, comparison.Outcome);
     }
 
-    [FixtureFact("record")]
+    [Fact]
     public void AsManifestPart_yields_kind_c2pa_form_c2pa_and_the_store_bytes()
     {
         var store = new EmbeddedC2paDetector().Detect(TestCarriers.Png(("caBX", TestCarriers.SyntheticStore()))).Store!;
