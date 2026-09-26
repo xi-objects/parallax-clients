@@ -1,6 +1,6 @@
 namespace Xio.Parallax.Client.C2pa.Services;
 
-/// <summary>Extracts a C2PA store from a WebP's RIFF chunk with FourCC C2PA, whose data is the whole superbox.</summary>
+/// <summary>Extracts the JUMBF manifest store from a WebP's RIFF chunk with FourCC C2PA, whose data is the whole superbox.</summary>
 internal sealed class WebPCarrierReader : ICarrierReader
 {
     private const int RiffHeaderLength = 12;
@@ -55,7 +55,7 @@ internal sealed class WebPCarrierReader : ICarrierReader
         }
 
         return store is null
-            ? new CarrierExtraction(null, "The WebP carries no C2PA chunk, so no C2PA store.")
-            : new CarrierExtraction(store, "A C2PA store from the WebP's C2PA chunk.");
+            ? new CarrierExtraction([], "The WebP carries no C2PA chunk, so no embedded manifest store.")
+            : new CarrierExtraction([store.Value], "A JUMBF manifest store from the WebP's C2PA chunk.");
     }
 }

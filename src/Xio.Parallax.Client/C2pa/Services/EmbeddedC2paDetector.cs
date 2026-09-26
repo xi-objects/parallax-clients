@@ -1,6 +1,6 @@
 namespace Xio.Parallax.Client.C2pa.Services;
 
-/// <summary>Detects an embedded C2PA manifest store in JPEG (APP11), PNG (caBX), WebP (C2PA chunk) and TIFF or DNG (tag 52545) files; any other file is reported as unsupported.</summary>
+/// <summary>Detects every embedded JUMBF manifest store in JPEG (APP11), PNG (caBX), WebP (C2PA chunk) and TIFF or DNG (tag 52545) files and classifies each c2pa or jumbf; any other file is reported as unsupported.</summary>
 public sealed class EmbeddedC2paDetector : IEmbeddedC2paDetector
 {
     private readonly IReadOnlyList<ICarrierReader> _readers;
@@ -25,23 +25,36 @@ public sealed class EmbeddedC2paDetector : IEmbeddedC2paDetector
         var reader = _readers.FirstOrDefault(candidate => candidate.Recognises(file.Span));
         if (reader is null)
         {
-            return new EmbeddedC2paResult(C2paCarrier.Unsupported, null, "The file's signature is not JPEG, PNG, WebP or TIFF, so whether it carries C2PA is not determined.");
+            return new EmbeddedC2paResult(C2paCarrier.Unsupported, EmbeddedC2paOutcome.Unsupported, [], "The file's signature is not JPEG, PNG, WebP or TIFF, so whether it carries an embedded manifest store is not determined.");
         }
 
         try
         {
             var extraction = reader.Extract(file);
-            if (extraction.Superbox is not { } superbox)
+            if (extraction.Superboxes.Count == 0)
             {
-                return new EmbeddedC2paResult(reader.Carrier, null, extraction.Detail);
+                return new EmbeddedC2paResult(reader.Carrier, EmbeddedC2paOutcome.Absent, [], extraction.Detail);
             }
 
-            var boxes = _jumbf.Summarise(superbox.Span);
-            return new EmbeddedC2paResult(reader.Carrier, new EmbeddedC2paStore(superbox.ToArray(), boxes), $"{extraction.Detail} {superbox.Length} bytes in {boxes.Count} boxes.");
+            var stores = extraction.Superboxes.Select(Store).ToList();
+            var repeated = stores.GroupBy(store => store.Kind).FirstOrDefault(group => group.Count() > 1);
+            if (repeated is not null)
+            {
+                return new EmbeddedC2paResult(reader.Carrier, EmbeddedC2paOutcome.Malformed, [], $"Malformed {reader.Carrier} embedding: it carries {repeated.Count()} manifest stores of kind '{repeated.Key}'; one kind carries one manifest.");
+            }
+
+            var kinds = string.Join(", ", stores.Select(store => $"{store.Kind} ({store.Bytes.Length} bytes in {store.Boxes.Count} boxes)"));
+            return new EmbeddedC2paResult(reader.Carrier, EmbeddedC2paOutcome.Found, stores, $"{extraction.Detail} Stores: {kinds}.");
         }
         catch (C2paFormatException exception)
         {
-            return new EmbeddedC2paResult(reader.Carrier, null, $"Malformed {reader.Carrier} C2PA embedding: {exception.Message}");
+            return new EmbeddedC2paResult(reader.Carrier, EmbeddedC2paOutcome.Malformed, [], $"Malformed {reader.Carrier} embedding: {exception.Message}");
         }
+    }
+
+    private EmbeddedC2paStore Store(ReadOnlyMemory<byte> superbox)
+    {
+        var boxes = _jumbf.Summarise(superbox.Span);
+        return new EmbeddedC2paStore(_jumbf.Classify(superbox.Span), superbox.ToArray(), boxes);
     }
 }

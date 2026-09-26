@@ -1,11 +1,13 @@
 namespace Xio.Parallax.Client.C2pa.Services;
 
-/// <summary>Reassembles a C2PA store from a JPEG's APP11 segments: each carries "JP", En, Z, the superbox's LBox and TBox, and a chunk of its payload.</summary>
-internal sealed class JpegCarrierReader(IJumbfStoreReader _jumbf) : ICarrierReader
+/// <summary>Reassembles every jumb box instance (other box types, such as JPEG XT's, are ignored) from a JPEG's APP11 segments, in document order: each segment carries "JP", En, Z, the superbox's LBox and TBox, and a chunk of its payload.</summary>
+internal sealed class JpegCarrierReader : ICarrierReader
 {
     private const int SegmentHeaderLength = 8;
     private const int BoxHeaderLength = 8;
     private const int ExtendedBoxHeaderLength = 16;
+
+    private static readonly byte[] SuperboxType = Encoding.Latin1.GetBytes(C2paConstants.SuperboxType);
 
     public C2paCarrier Carrier => C2paCarrier.Jpeg;
 
@@ -16,29 +18,22 @@ internal sealed class JpegCarrierReader(IJumbfStoreReader _jumbf) : ICarrierRead
 
     public CarrierExtraction Extract(ReadOnlyMemory<byte> file)
     {
-        var groups = new SortedDictionary<ushort, JpegBoxGroup>();
+        var groups = new Dictionary<ushort, JpegBoxGroup>();
+        var order = new List<JpegBoxGroup>();
         foreach (var payload in App11Payloads(file))
         {
-            Collect(file.Span.Slice(payload.Start, payload.Length), payload.Start, groups);
+            Collect(file.Span.Slice(payload.Start, payload.Length), payload.Start, groups, order);
         }
 
         if (groups.Count == 0)
         {
-            return new CarrierExtraction(null, "The JPEG carries no JUMBF APP11 segment, so no C2PA store.");
+            return new CarrierExtraction([], "The JPEG carries no jumb box instance in APP11, so no embedded manifest store.");
         }
 
-        var stores = groups.Values
-            .Select(group => group.Reassemble(file.Span))
-            .Where(superbox => _jumbf.IsC2paStore(superbox))
+        var superboxes = order
+            .Select(group => (ReadOnlyMemory<byte>)group.Reassemble(file.Span))
             .ToList();
-        if (stores.Count > 1)
-        {
-            throw new C2paFormatException($"The JPEG carries {stores.Count} C2PA manifest stores in APP11; exactly one is expected.");
-        }
-
-        return stores.Count == 1
-            ? new CarrierExtraction(stores[0], $"A C2PA store reassembled from APP11 segments ({groups.Count} JUMBF box instance(s) present).")
-            : new CarrierExtraction(null, $"The JPEG carries {groups.Count} JUMBF box instance(s) in APP11, none of them a C2PA manifest store.");
+        return new CarrierExtraction(superboxes, $"{superboxes.Count} JUMBF box instance(s) reassembled from APP11 segments.");
     }
 
     private static List<(int Start, int Length)> App11Payloads(ReadOnlyMemory<byte> file)
@@ -96,7 +91,7 @@ internal sealed class JpegCarrierReader(IJumbfStoreReader _jumbf) : ICarrierRead
         return payloads;
     }
 
-    private static void Collect(ReadOnlySpan<byte> payload, int start, SortedDictionary<ushort, JpegBoxGroup> groups)
+    private static void Collect(ReadOnlySpan<byte> payload, int start, Dictionary<ushort, JpegBoxGroup> groups, List<JpegBoxGroup> order)
     {
         if (!payload.StartsWith(C2paConstants.JpegApp11Magic))
         {
@@ -111,6 +106,11 @@ internal sealed class JpegCarrierReader(IJumbfStoreReader _jumbf) : ICarrierRead
         var instance = BinaryPrimitives.ReadUInt16BigEndian(payload[2..]);
         var sequence = BinaryPrimitives.ReadUInt32BigEndian(payload[4..]);
         var box = payload[SegmentHeaderLength..];
+        if (!box.Slice(4, 4).SequenceEqual(SuperboxType))
+        {
+            return;
+        }
+
         var headerLength = BinaryPrimitives.ReadUInt32BigEndian(box) == 1 ? ExtendedBoxHeaderLength : BoxHeaderLength;
         if (box.Length < headerLength)
         {
@@ -121,6 +121,7 @@ internal sealed class JpegCarrierReader(IJumbfStoreReader _jumbf) : ICarrierRead
         {
             group = new JpegBoxGroup(instance, box[..headerLength].ToArray());
             groups.Add(instance, group);
+            order.Add(group);
         }
 
         group.Add(sequence, box[..headerLength], (start + SegmentHeaderLength + headerLength, box.Length - headerLength));

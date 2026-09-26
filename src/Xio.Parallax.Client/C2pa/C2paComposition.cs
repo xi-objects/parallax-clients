@@ -7,7 +7,7 @@ internal static class C2paComposition
 
     internal static readonly IReadOnlyList<ICarrierReader> CarrierReaders =
     [
-        new JpegCarrierReader(JumbfReader),
+        new JpegCarrierReader(),
         new PngCarrierReader(),
         new WebPCarrierReader(),
         new TiffCarrierReader(),

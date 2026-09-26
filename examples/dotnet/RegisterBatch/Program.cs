@@ -10,19 +10,26 @@
 //   PARALLAX_MAX_REQUEST_BYTES  the operator's per-request byte cap (required; not in the document)
 //   PARALLAX_MAX_IMAGES         the operator's per-request image cap (required)
 //   PARALLAX_SLOT_ID            optional: an open slot to resume into instead of opening a new one
-//   PARALLAX_ATTACH_EMBEDDED_C2PA  "yes" to attach each image's embedded C2PA store as manifest[c2pa]
+//   PARALLAX_INCLUDE_EMBEDDED   "yes" to include each image's embedded JUMBF manifest store(s), each
+//                               under its classified kind (c2pa or jumbf)
 //
-// Each image's manifests are what you choose to attach: a sidecar <image>.json beside the file is
-// attached as manifest[xi-manifest], and the embedded C2PA store is attached only when asked.
+// Each image's manifests are what its user chooses: a sidecar <image>.json beside the file is a JSON
+// manifest of kind xi-manifest; a sidecar <image>.c2pa or <image>.jumbf is a JUMBF manifest classified
+// c2pa or jumbf by its own bytes; embedded stores are included only when asked. The whole folder is
+// resolved before anything is sent: a JUMBF sidecar that differs from the image's embedded store, a
+// malformed store, an unrecognised carrier when the embedded store matters, or two manifests of one
+// kind refuses the whole folder, every offending image listed.
 //
 // Run from the repository root: dotnet run --project examples/dotnet/RegisterBatch
 
+const string JsonSidecarExtension = ".json";
+string[] jumbfSidecarExtensions = [".c2pa", ".jumbf"];
+string[] sidecarExtensions = [JsonSidecarExtension, .. jumbfSidecarExtensions];
 var contentType = Required("PARALLAX_IMAGE_TYPE");
 var folder = Required("PARALLAX_IMAGES");
-var attachEmbedded = string.Equals(Environment.GetEnvironmentVariable("PARALLAX_ATTACH_EMBEDDED_C2PA"), "yes", StringComparison.OrdinalIgnoreCase);
-var detector = new EmbeddedC2paDetector();
+var includeEmbedded = string.Equals(Environment.GetEnvironmentVariable("PARALLAX_INCLUDE_EMBEDDED"), "yes", StringComparison.OrdinalIgnoreCase);
 var paths = Directory.EnumerateFiles(folder)
-    .Where(path => !path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+    .Where(path => !sidecarExtensions.Any(extension => path.EndsWith(extension, StringComparison.OrdinalIgnoreCase)))
     .OrderBy(path => path, StringComparer.Ordinal)
     .ToList();
 var images = paths.Select(path => ImageUpload.FromFile(path, contentType)).ToList();
@@ -31,10 +38,26 @@ if (images.Count == 0)
     throw new InvalidOperationException($"no images under {folder}");
 }
 
-var items = paths.Zip(images, (path, image) => new RegistrationItem(image, ManifestsFor(path, image))).ToList();
-foreach (var (path, item) in paths.Zip(items))
+var requests = paths.Zip(images, (path, image) => new ManifestRequest(image, new ManifestSelection(includeEmbedded, SidecarsFor(path)))).ToList();
+IReadOnlyList<RegistrationItem> items;
+try
 {
-    Console.WriteLine($"  {Path.GetFileName(path)}: {(item.Manifests.Count == 0 ? "no manifests" : string.Join(", ", item.Manifests.Select(m => m.Kind)))}");
+    items = new ManifestResolver().Resolve(requests);
+}
+catch (ManifestRefusalException refused)
+{
+    Console.Error.WriteLine($"refused {refused.Refusals.Count} image(s); nothing was sent:");
+    foreach (var refusal in refused.Refusals)
+    {
+        Console.Error.WriteLine($"  {refusal.FileName}: {refusal.Reason}");
+    }
+
+    return 1;
+}
+
+foreach (var item in items)
+{
+    Console.WriteLine($"  {item.Image.FileName}: {(item.Manifests.Count == 0 ? "no manifests" : string.Join(", ", item.Manifests.Select(m => m.Kind)))}");
 }
 
 var baseUrl = Environment.GetEnvironmentVariable("PARALLAX_BASE_URL");
@@ -70,26 +93,26 @@ foreach (var query in found.Results.Queries ?? [])
     Console.WriteLine($"  {query.ImageHash}: {query.State} matched={query.Result?.Matched}");
 }
 
-// The manifests the registrant attaches for one image: its sidecar JSON, and its embedded C2PA store on request.
-IReadOnlyList<ManifestPart> ManifestsFor(string path, ImageUpload image)
+return 0;
+
+// The sidecars beside one image: <image>.json as kind xi-manifest, <image>.c2pa and <image>.jumbf classified by their bytes.
+IReadOnlyList<SidecarManifest> SidecarsFor(string path)
 {
-    var parts = new List<ManifestPart>();
-    var sidecar = path + ".json";
-    if (File.Exists(sidecar))
+    var sidecars = new List<SidecarManifest>();
+    if (File.Exists(path + JsonSidecarExtension))
     {
-        parts.Add(new ManifestPart("xi-manifest", ManifestForm.Json, File.ReadAllBytes(sidecar)));
+        sidecars.Add(SidecarManifest.JsonFile(path + JsonSidecarExtension, "xi-manifest"));
     }
 
-    if (attachEmbedded)
+    foreach (var extension in jumbfSidecarExtensions)
     {
-        var found = detector.Detect(image.Bytes);
-        if (found.Store is not null)
+        if (File.Exists(path + extension))
         {
-            parts.Add(C2paAttachment.AsManifestPart(found.Store));
+            sidecars.Add(SidecarManifest.JumbfFile(path + extension));
         }
     }
 
-    return parts;
+    return sidecars;
 }
 
 static string Required(string name)

@@ -1,7 +1,9 @@
-"""Per-carrier extraction of an embedded C2PA manifest store, per the C2PA specification's embedding rules.
+"""Per-carrier extraction of embedded JUMBF manifest stores, per the C2PA specification's embedding rules.
 
-Each extractor returns the store's bytes verbatim (or None when the carrier holds none) and raises
-`CarrierError` when the carrier itself is malformed. None of them parses the claims inside the store.
+Each extractor returns every store's bytes verbatim, in document order (an empty list when the carrier
+holds none), and raises `CarrierError` when the carrier itself is malformed. Only a JPEG can carry more
+than one (one per APP11 box instance); PNG, WebP and TIFF carry at most one. None of them judges or
+classifies the store: the detector's JUMBF walk does.
 """
 
 from __future__ import annotations
@@ -9,8 +11,6 @@ from __future__ import annotations
 import struct
 import zlib
 from collections import defaultdict
-
-from .jumbf import is_c2pa_store
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _PNG_STORE_CHUNK = b"caBX"
@@ -64,12 +64,20 @@ def _app11_header_end(payload: bytes) -> int:
     return end
 
 
-def extract_jpeg(data: bytes) -> bytes | None:
-    """Reassemble the C2PA store from its APP11 segments: per En, the repeated header then the chunks by Z."""
+def extract_jpeg(data: bytes) -> list[bytes]:
+    """Reassemble every APP11 `jumb` box instance, in document order: per En, the repeated header then the chunks.
+
+    A box instance of another type (JPEG XT writes `LCHK`, for one) is not a store and is ignored entirely.
+    """
     headers: dict[int, bytes] = {}
     chunks: dict[int, dict[int, bytes]] = defaultdict(dict)
     for payload in _app11_segments(data):
-        if not payload.startswith(b"JP") or len(payload) < 16 or payload[12:16] != b"jumb":
+        if not payload.startswith(b"JP"):
+            continue
+        # The payload excludes the 2-byte segment length: JP, En, Z, LBox, TBox are its first 16 bytes.
+        if len(payload) < 16:
+            raise CarrierError(f"APP11 JP segment of {len(payload)} bytes cannot carry En, Z and a box header")
+        if payload[12:16] != b"jumb":
             continue
         en, z = struct.unpack_from(">HI", payload, 2)
         header_end = _app11_header_end(payload)
@@ -79,17 +87,10 @@ def extract_jpeg(data: bytes) -> bytes | None:
         if z in chunks[en]:
             raise CarrierError(f"APP11 box instance {en} repeats packet sequence number {z}")
         chunks[en][z] = payload[header_end:]
-    stores: list[bytes] = []
-    for en, header in headers.items():
-        superbox = header + b"".join(chunks[en][z] for z in sorted(chunks[en]))
-        if is_c2pa_store(superbox):
-            stores.append(superbox)
-    if len(stores) > 1:
-        raise CarrierError(f"JPEG carries {len(stores)} C2PA manifest stores; the specification allows one")
-    return stores[0] if stores else None
+    return [header + b"".join(chunks[en][z] for z in sorted(chunks[en])) for en, header in headers.items()]
 
 
-def extract_png(data: bytes) -> bytes | None:
+def extract_png(data: bytes) -> list[bytes]:
     """Return the data of the `caBX` chunk, checking each chunk's CRC up to IEND."""
     offset = len(PNG_SIGNATURE)
     found: bytes | None = None
@@ -109,12 +110,12 @@ def extract_png(data: bytes) -> bytes | None:
                 raise CarrierError("PNG carries more than one caBX chunk; the specification allows one")
             found = body
         if chunk_type == b"IEND":
-            return found
+            return [] if found is None else [found]
         offset = end
     raise CarrierError("PNG ends without an IEND chunk")
 
 
-def extract_webp(data: bytes) -> bytes | None:
+def extract_webp(data: bytes) -> list[bytes]:
     """Return the data of the RIFF `C2PA` chunk of a WebP file."""
     (riff_size,) = struct.unpack_from("<I", data, 4)
     end = 8 + riff_size
@@ -129,12 +130,12 @@ def extract_webp(data: bytes) -> bytes | None:
         if body_end > end:
             raise CarrierError(f"RIFF chunk {fourcc!r} at offset {offset} overruns the file")
         if fourcc == _WEBP_STORE_CHUNK:
-            return data[offset + 8 : body_end]
+            return [data[offset + 8 : body_end]]
         offset = body_end + (size & 1)
-    return None
+    return []
 
 
-def extract_tiff(data: bytes) -> bytes | None:
+def extract_tiff(data: bytes) -> list[bytes]:
     """Return the bytes of tag 52545 (0xCD41) in the first IFD of a classic (not Big) TIFF or DNG."""
     order = "<" if data[:2] == b"II" else ">"
     if len(data) < 8:
@@ -154,9 +155,9 @@ def extract_tiff(data: bytes) -> bytes | None:
         if size == 0:
             raise CarrierError(f"TIFF tag 0xCD41 has an unusable field type {field_type}")
         if size <= 4:
-            return data[entry + 8 : entry + 8 + size]
+            return [data[entry + 8 : entry + 8 + size]]
         (value_offset,) = struct.unpack_from(order + "I", data, entry + 8)
         if value_offset + size > len(data):
             raise CarrierError("TIFF tag 0xCD41 points outside the file")
-        return data[value_offset : value_offset + size]
-    return None
+        return [data[value_offset : value_offset + size]]
+    return []

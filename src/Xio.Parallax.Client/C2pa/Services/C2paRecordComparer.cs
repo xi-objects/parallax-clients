@@ -1,6 +1,6 @@
 namespace Xio.Parallax.Client.C2pa.Services;
 
-/// <summary>Compares an embedded C2PA store with a recovered record: BLAKE3-256 of the store bytes against the declared hash of each jumbf-form manifest, never a json-form one.</summary>
+/// <summary>Compares an embedded JUMBF manifest store with a recovered record: BLAKE3-256 of the store bytes against the declared hash of each jumbf-form manifest, never a json-form one.</summary>
 public sealed class C2paRecordComparer : IC2paRecordComparer
 {
     /// <inheritdoc/>

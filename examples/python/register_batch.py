@@ -10,10 +10,14 @@ Environment:
   PARALLAX_MAX_REQUEST_BYTES  the operator's per-request byte cap (required; not in the document)
   PARALLAX_MAX_IMAGES         the operator's per-request image cap (required)
   PARALLAX_SLOT_ID            optional: an open slot to resume into instead of opening a new one
-  PARALLAX_ATTACH_EMBEDDED_C2PA  "yes" to attach each image's embedded C2PA store as manifest[c2pa]
+  PARALLAX_INCLUDE_EMBEDDED   "yes" to include each image's embedded JUMBF manifest store(s)
 
-Each image's manifests are what you choose to attach: a sidecar `<image>.json` beside the file is
-attached as manifest[xi-manifest], and the embedded C2PA store is attached only when asked.
+Each image's manifests are what you choose: `<image>.json` beside the file is a JSON sidecar sent as
+manifest[xi-manifest]; `<image>.c2pa` or `<image>.jumbf` beside it is a JUMBF sidecar whose kind
+(`c2pa` or `jumbf`) is classified from its own bytes; the embedded store(s) are included only when
+asked. The whole folder is resolved before anything is sent: a JUMBF sidecar that differs from the
+image's embedded store, a malformed store, an unrecognised carrier where the embedded store matters,
+or two manifests of one kind refuses the whole run, every offending image listed.
 
 Run from the repository root: uv run python examples/python/register_batch.py
 """
@@ -27,15 +31,15 @@ from pathlib import Path
 from xio_parallax_client import (
     ImageUpload,
     LookupBatchOptions,
-    ManifestForm,
-    ManifestPart,
+    ManifestRefusalError,
+    ManifestRequest,
+    ManifestSelection,
     ParallaxClient,
     ParallaxClientOptions,
     RegisterBatchOptions,
-    RegistrationItem,
+    SidecarManifest,
     UploadBatching,
-    as_manifest_part,
-    detect_embedded_c2pa,
+    resolve_manifests,
 )
 from xio_parallax_client.generated.models import SlotProgressResponse
 
@@ -48,34 +52,43 @@ def required(name: str) -> str:
     return value
 
 
-def manifests_for(path: Path, image: ImageUpload, attach_embedded: bool) -> list[ManifestPart]:
-    """The manifests the registrant attaches for one image: its sidecar JSON, and its embedded C2PA store on request."""
-    parts: list[ManifestPart] = []
-    sidecar = path.with_suffix(path.suffix + ".json")
-    if sidecar.is_file():
-        parts.append(ManifestPart("xi-manifest", ManifestForm.JSON, sidecar.read_bytes()))
-    if attach_embedded:
-        found = detect_embedded_c2pa(image.data)
-        if found.store is not None:
-            parts.append(as_manifest_part(found.store))
-    return parts
+_JSON_SUFFIX = ".json"
+_JUMBF_SUFFIXES = (".c2pa", ".jumbf")
+_SIDECAR_SUFFIXES = (_JSON_SUFFIX, *_JUMBF_SUFFIXES)
+
+
+def selection_for(path: Path, include_embedded: bool) -> ManifestSelection:
+    """The manifests chosen for one image: the sidecars beside it, and its embedded store(s) on request."""
+    sidecars: list[SidecarManifest] = []
+    json_sidecar = path.with_suffix(path.suffix + _JSON_SUFFIX)
+    if json_sidecar.is_file():
+        sidecars.append(SidecarManifest.json_file(json_sidecar, "xi-manifest"))
+    for suffix in _JUMBF_SUFFIXES:
+        jumbf_sidecar = path.with_suffix(path.suffix + suffix)
+        if jumbf_sidecar.is_file():
+            sidecars.append(SidecarManifest.jumbf_file(jumbf_sidecar))
+    return ManifestSelection(include_embedded=include_embedded, sidecars=sidecars)
 
 
 def main() -> None:
-    """Registers every image in the folder with its manifests, then looks every one of them up."""
+    """Resolves every image's manifests, registers them all if none refused, then looks every one of them up."""
     content_type = required("PARALLAX_IMAGE_TYPE")
     folder = Path(required("PARALLAX_IMAGES"))
-    attach_embedded = os.environ.get("PARALLAX_ATTACH_EMBEDDED_C2PA", "").lower() == "yes"
-    paths = [p for p in sorted(folder.iterdir()) if p.is_file() and p.suffix.lower() != ".json"]
+    include_embedded = os.environ.get("PARALLAX_INCLUDE_EMBEDDED", "").lower() == "yes"
+    paths = [p for p in sorted(folder.iterdir()) if p.is_file() and p.suffix.lower() not in _SIDECAR_SUFFIXES]
     images = [ImageUpload.from_file(p, content_type) for p in paths]
     if not images:
         sys.exit(f"no images under {folder}")
-    items = [
-        RegistrationItem(image=image, manifests=manifests_for(p, image, attach_embedded))
-        for p, image in zip(paths, images)
-    ]
-    for p, item in zip(paths, items):
-        print(f"  {p.name}: {[m.kind for m in item.manifests] or 'no manifests'}")
+    requests = [ManifestRequest(image, selection_for(p, include_embedded)) for p, image in zip(paths, images)]
+    try:
+        items = resolve_manifests(requests)
+    except ManifestRefusalError as refused:
+        print(f"refused {len(refused.refusals)} image(s); nothing was sent:", file=sys.stderr)
+        for refusal in refused.refusals:
+            print(f"  {refusal.file_name}: {refusal.reason}", file=sys.stderr)
+        sys.exit(1)
+    for item in items:
+        print(f"  {item.image.file_name}: {[m.kind for m in item.manifests] or 'no manifests'}")
 
     client = ParallaxClient(
         ParallaxClientOptions(

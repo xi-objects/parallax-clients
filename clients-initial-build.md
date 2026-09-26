@@ -223,12 +223,12 @@ Xio.Parallax.Client.slnx            at the root
 Directory.Build.props  Directory.Packages.props  NuGet.config (nuget.org only)  global.json
 src/Xio.Parallax.Client/            the .NET package
   Generated/                        Kiota output, never edited, regenerated from openapi/v1.json
-  Multipart/  Slots/  Verification/ the hand-written layer
+  Multipart/  Slots/  Verification/  Manifests/ the hand-written layer
 tests/Xio.Parallax.Client.Tests/
 pyproject.toml  uv.lock             at the root; hatchling, package under python/
 python/xio_parallax_client/         the Python package
   generated/                        openapi-python-client output, never edited
-  client.py  multipart.py  slots.py  problems.py  verification/
+  client.py  multipart.py  slots.py  problems.py  verification/  manifests.py
 python/tests/
 examples/dotnet/GettingStarted/  examples/python/getting_started.py
 ```
@@ -300,12 +300,16 @@ examples/dotnet/GettingStarted/  examples/python/getting_started.py
    - Conformance: one fixture record captured from the live API (with its trust root, once
      ruling 1 lands) and the API repository's own fixtures pin the preimage; a tamper, a stripped
      manifest and a wrong root each have a failing test.
-4. **C2PA detection (brief 2, after the verifier ships).** Extract the embedded JUMBF/C2PA store
-   from a file (JPEG APP11 segments, PNG `caBX`, and the other carriers the design note lists),
-   show it, and attach it explicitly as `manifest[c2pa]` with `application/c2pa` only when the
-   caller says so; on the finder's side, extract the store from the found file and compare it to
-   the recovered record's manifests by BLAKE3 of the bytes, reporting match, mismatch or absent.
-   Never parsed by REST, never attached without the registrant's say.
+4. **C2PA detection (brief 2, after the verifier ships; revised 2026-09-26).** Extract every
+   embedded JUMBF manifest store from a file (a JPEG's APP11 segments, one or more box instances,
+   in document order; PNG `caBX`; WebP `C2PA`; classic TIFF tag 0xCD41), show it, and classify each
+   store `c2pa` or `jumbf` by the C2PA manifest-store UUID and label; classification never refuses.
+   Inclusion is the registrant's selection per image, resolved over the whole collection before
+   anything is sent: the embedded store(s) or not, plus JSON or JUMBF sidecars, with a JUMBF
+   sidecar and an embedded store required to match byte-identically or refuse the collection. On
+   the finder's side, extract the store(s) from the found file and compare each to the recovered
+   record's manifests by BLAKE3 of the bytes, reporting match, mismatch, absent from the record, or
+   not published. Never parsed by REST, never included without the registrant's say.
 
 ### regeneration, by hand
 - No CI: nothing is shipped (ruled 2026-09-22). When the API's contract changes, the live
@@ -335,8 +339,10 @@ examples/dotnet/GettingStarted/  examples/python/getting_started.py
 - **Python comes from openapi-python-client; .NET comes from Kiota** (ruled 2026-09-22 when
   asked, over NSwag: it reads the API's OpenAPI 3.1.1, needs no operationIds, and its multipart
   body takes arbitrary part names).
-- **C2PA detection lives in the client, never in REST**, and a detected manifest is attached only
-  when the registrant chooses to.
+- **C2PA detection lives in the client, never in REST** (revised 2026-09-26: REST requires only
+  well-formed JUMBF, never that JUMBF be C2PA; the client classifies a well-formed store `c2pa` or
+  `jumbf` and never refuses on that account), and a detected store is included only when the
+  registrant's selection says so.
 - **Public git repository, the docs' getting-started walk as the first example.** The brief's
   "CI that regenerates from the live document" was superseded the same day by the no-CI ruling
   below: regeneration is a command run by hand when the contract changes.
@@ -365,7 +371,9 @@ examples/dotnet/GettingStarted/  examples/python/getting_started.py
   it only when the registrant says so, and compare a found file's store with the recovered record
   by BLAKE3 of the bytes, exactly as the API treats a manifest: opaque bytes. No C2PA library, no
   claim decoding, no COSE validation; an unrecognised carrier is reported as unsupported, never as
-  "no C2PA".
+  "no C2PA". **Superseded in part by the 2026-09-26 rulings below:** a store need only be
+  well-formed JUMBF, never C2PA specifically; a JPEG may carry several box instances; and
+  attaching is now a resolved selection governed by the conflict rule, not a bare yes/no.
 - **No CI (ruled 2026-09-22):** nothing is shipped, so no workflow runs; regeneration and the
   gates are commands run by hand.
 - **Roots straight from Orbital (ruled 2026-09-22):** the clients fetch `pinnedRoots` from
@@ -386,6 +394,39 @@ examples/dotnet/GettingStarted/  examples/python/getting_started.py
   at `CN=Institute of Provenance Root CA`, so `fixtures/record-legacy/orbital-info.json` was
   captured from production Orbital's own `/info` rather than reusing the dev root in
   `fixtures/record/`.
+- **REST validates JUMBF, not C2PA (ruled 2026-09-26):** REST validates that a manifest is
+  well-formed JUMBF and rejects invalid JUMBF; it does not require that a JUMBF manifest be C2PA,
+  and anyone's own JUMBF spec is kept. The client's box walk is extraction plus a local preflight
+  over the whole collection, never stricter than the JUMBF box grammar. Partly supersedes "C2PA at
+  the bytes level (ruled 2026-09-22)", which spoke only of the embedded C2PA store.
+- **Classification, not gatekeeping (ruled 2026-09-26):** the C2PA manifest-store UUID and the
+  label `c2pa` classify a well-formed store as kind `c2pa` (sent as `application/c2pa`) and every
+  other well-formed store as kind `jumbf` (sent as `application/jumbf`); the classification never
+  refuses. The server stores both forms as `jumbf`.
+- **Several JUMBF instances per JPEG (ruled 2026-09-26):** a JPEG may carry several JUMBF box
+  instances in APP11: every well-formed one is a manifest under its kind, in document order; two
+  of the same kind refuse naming the count. A malformed instance makes the detection Malformed.
+  PNG, WebP and TIFF hold at most one, as ruled 2026-09-22.
+- **Inclusion is the integrator's selection (ruled 2026-09-26):** the client detects, shows and
+  classifies; inclusion is the integrator's own selection per image: include the embedded
+  block(s) or not, plus sidecars, each JSON (kind stated) or JUMBF (classified by its own bytes);
+  none is neither. The register calls send exactly the list they are given. Partly supersedes
+  "C2PA detection lives in the client, never in REST", whose "attached only when the registrant
+  chooses to" is now this selection, not a bare yes/no.
+- **The conflict rule (ruled 2026-09-26):** when an image carries an embedded block and a JUMBF
+  sidecar is offered, the two must be byte-identical (with several blocks or sidecars, the two
+  sets must match exactly); identical bytes are one manifest, included once; anything else
+  refuses. Whenever the embedded block matters (include embedded, or any JUMBF sidecar given): a
+  malformed block refuses, an unrecognised carrier refuses (the client cannot say whether a block
+  is there and never skips the check), a supported carrier with no block contributes nothing. Two
+  manifests of one kind on one image refuse. A JSON sidecar never conflicts with an embedded
+  block. Supersedes in part "C2PA at the bytes level (ruled 2026-09-22)"'s "attach it only when
+  the registrant says so".
+- **Whole-collection resolution (ruled 2026-09-26):** resolution runs over every item of a
+  collection before anything is sent; any refusal refuses the whole collection with every
+  offending item listed, and nothing is returned partially.
+- **Names keep their C2PA history (ruled 2026-09-26):** type, namespace and module names keep
+  their C2PA names; the words say "embedded JUMBF manifest store, classified c2pa or jumbf."
 
 ### design facts that follow from the rulings
 - Verdicts, not booleans, from the verifier; refusals, not skips, for an unknown hash

@@ -1,15 +1,19 @@
 namespace Xio.Parallax.Client.C2pa;
 
-/// <summary>The carrier signatures, box types and identifiers the C2PA embedding rules fix.</summary>
+/// <summary>The carrier signatures, box types, identifiers and manifest kinds the JUMBF and C2PA embedding rules fix.</summary>
 internal static class C2paConstants
 {
     internal const string SuperboxType = "jumb";
 
     internal const string DescriptionType = "jumd";
 
-    internal const string AttachmentKind = "c2pa";
+    internal const string C2paKind = "c2pa";
 
-    internal const int MaxBoxDepth = 32;
+    internal const string JumbfKind = "jumbf";
+
+    internal const string C2paStoreLabel = "c2pa";
+
+    internal const int MaxBoxDepth = 64;
 
     internal const byte LabelToggle = 0x02;
 

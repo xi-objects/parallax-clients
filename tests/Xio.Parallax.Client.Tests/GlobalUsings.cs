@@ -28,6 +28,8 @@ global using Xio.Parallax.Client.C2pa.Interfaces;
 global using Xio.Parallax.Client.C2pa.Models;
 global using Xio.Parallax.Client.C2pa.Services;
 global using Xio.Parallax.Client.Generated.Models;
+global using Xio.Parallax.Client.Manifests.Models;
+global using Xio.Parallax.Client.Manifests.Services;
 global using Xio.Parallax.Client.Multipart.Enums;
 global using Xio.Parallax.Client.Multipart.Models;
 global using Xio.Parallax.Client.Problems;
