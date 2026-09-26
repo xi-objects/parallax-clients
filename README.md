@@ -153,7 +153,7 @@ is the design of record.
 
 ## Publishing
 
-`Xio.Parallax.Client` is also published, by hand, as a NuGet package to the XI Objects
-`xiobjects` feed on Azure DevOps Artifacts. Run `.\publish.ps1 [-Version x.y.z]` from the repo
+`Xio.Parallax.Client` is also published, by hand, as a NuGet package to the organisation's Azure
+DevOps Artifacts feed. Run `.\publish.ps1 -FeedUrl <feed-url> [-Version x.y.z]` from the repo
 root (`az login` or `$env:NUGET_PAT` for credentials); the version lives in
 `src/Xio.Parallax.Client/Xio.Parallax.Client.csproj`.
