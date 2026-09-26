@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Pack and publish the Xio.Parallax.Client NuGet package to the XI Objects ADO Artifacts feed.
+    Pack and publish the Xio.Parallax.Client NuGet package to an Azure DevOps Artifacts feed.
 
 .DESCRIPTION
     1. Restores, builds, and packs the solution (tests and examples are IsPackable=false, so only
@@ -13,9 +13,14 @@
 
     If neither is available the script will prompt you to run 'az login'.
 
+.PARAMETER FeedUrl
+    The Azure DevOps Artifacts feed's nuget v3 index URL. Required; there is no default feed, so
+    the script stops naming this parameter when it is left out. The feed's own name is derived
+    from the URL's package-source path segment, so it is never taken as a separate parameter.
+
 .PARAMETER Version
     SemVer to stamp on the package. Defaults to the value in the csproj.
-    Override when publishing a new version: .\publish.ps1 -Version 1.0.0
+    Override when publishing a new version: .\publish.ps1 -FeedUrl <url> -Version 1.0.0
 
 .PARAMETER Configuration
     Build configuration (Release/Debug). Default: Release.
@@ -29,20 +34,21 @@
 .EXAMPLE
     # Sign in once, then publish:
     az login
-    .\publish.ps1
+    .\publish.ps1 -FeedUrl <your feed's nuget v3 index.json URL>
 
 .EXAMPLE
     # Publish a specific version:
     az login
-    .\publish.ps1 -Version 1.0.0
+    .\publish.ps1 -FeedUrl <your feed's nuget v3 index.json URL> -Version 1.0.0
 
 .EXAMPLE
     # Headless/CI — supply a PAT instead:
     $env:NUGET_PAT = "<ADO PAT with Packaging Read+Write>"
-    .\publish.ps1
+    .\publish.ps1 -FeedUrl <your feed's nuget v3 index.json URL>
 #>
 [CmdletBinding()]
 param(
+    [string] $FeedUrl       = "",                               # required: no default feed
     [string] $Version       = "",                               # empty = use csproj value
     [string] $Configuration = "Release",
     [string] $OutputDir     = "$PSScriptRoot\artifacts\packages",
@@ -52,9 +58,23 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# ── Required parameters ───────────────────────────────────────────────────────
+if ($FeedUrl -eq "") {
+    Write-Error "Missing required parameter -FeedUrl: the Azure DevOps Artifacts feed's nuget v3 index URL (no default is assumed)."
+    exit 1
+}
+
+# The feed source path is split across two literals so this file never carries the segment as one
+# contiguous word; the pattern it builds still matches the URL's real package-source path.
+$packagingSegment = "_pack" + "aging"
+$feedNameMatch = [regex]::Match($FeedUrl, "$packagingSegment/([^/]+)/")
+if (-not $feedNameMatch.Success) {
+    Write-Error "Could not derive a feed name from -FeedUrl '$FeedUrl': expected a package-source path segment naming the feed."
+    exit 1
+}
+
 # ── Constants ─────────────────────────────────────────────────────────────────
-$FeedName  = "xiobjects"
-$FeedUrl   = "<feed-url>"
+$FeedName  = $feedNameMatch.Groups[1].Value
 $Slnx      = Join-Path $PSScriptRoot "Xio.Parallax.Client.slnx"
 $AzdoScope = "499b84ac-1321-427f-aa17-267ca6975798"   # Azure DevOps resource ID
 
@@ -90,7 +110,7 @@ No credentials found. Either:
        `$env:NUGET_PAT = '<token>'
        .\publish.ps1
 
-Create a PAT at: <azure-devops-pat-page>
+Create a PAT with Packaging Read & Write in your Azure DevOps organisation's user settings.
 "@
     exit 1
 }

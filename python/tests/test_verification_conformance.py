@@ -25,6 +25,11 @@ _FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "record"
 _LOOKUP_FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "lookup"
 _LEGACY_FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "record-legacy"
 
+pytestmark = pytest.mark.skipif(
+    not _FIXTURE_DIR.is_dir() or not _LOOKUP_FIXTURE_DIR.is_dir() or not _LEGACY_FIXTURE_DIR.is_dir(),
+    reason="fixtures/record, fixtures/lookup or fixtures/record-legacy is not present: a local capture, not part of the repository",
+)
+
 _EXPECTED_PASSED = (
     "originalImageHash",
     "contentHash",
@@ -153,8 +158,8 @@ def test_legacy_record_verifies_with_every_performed_check_passed() -> None:
     """A real production record registered through the older Forensics Lab path
     (`fixtures/record-legacy/record.json`): `canonicalVersion: 0`, `hashAlgorithm: "blake3-256"`
     (lower-case), `contentHash` in upper-case hex, a single `c2pa` manifest with `hash: null` and
-    `signature: null`, and no `collectionSignature`. Captured 2026-09-23 from
-    `https://<production-forensics-lab-host>/api/attribution/records`.
+    `signature: null`, and no `collectionSignature`. Captured 2026-09-23 from the production
+    Forensics Lab records endpoint (`POST /api/attribution/records`).
     The chain ends at `CN=Institute of Provenance Root CA`, which `fixtures/record/orbital-info.json`'s
     dev root does not carry, so the roots here were fetched from production Orbital's own `/info`
     instead (`fixtures/record-legacy/orbital-info.json`).

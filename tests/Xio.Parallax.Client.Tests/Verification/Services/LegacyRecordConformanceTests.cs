@@ -7,8 +7,8 @@ namespace Xio.Parallax.Client.Tests.Verification.Services;
 /// <c>hash: null</c> and <c>signature: null</c>, and no <c>collectionSignature</c>. This verifier
 /// implements no canonical version 0 preimage, so the manifest and collection checks are never
 /// passed; the image signature, leaf key and chain checks are unaffected and must pass.
-/// Captured 2026-09-23 from
-/// <c>https://<production-forensics-lab-host>/api/attribution/records</c>.
+/// Captured 2026-09-23 from the production Forensics Lab records endpoint
+/// (<c>POST /api/attribution/records</c>).
 /// The chain ends at <c>CN=Institute of Provenance Root CA</c>, which
 /// <c>fixtures/record/orbital-info.json</c>'s dev root does not carry, so the roots here were
 /// fetched from production Orbital's own <c>/info</c> instead (<c>fixtures/record-legacy/orbital-info.json</c>).
@@ -20,7 +20,7 @@ public sealed class LegacyRecordConformanceTests
     private readonly IAttributionVerifier _verifier = new AttributionVerifier();
     private readonly ITrustRootReader _reader = new TrustRootReader();
 
-    [Fact]
+    [FixtureFact("record-legacy")]
     public async Task The_legacy_record_verifies_with_every_performed_check_passed_and_manifest_checks_not_recomputable()
     {
         var record = await LoadRecordAsync();
@@ -38,7 +38,7 @@ public sealed class LegacyRecordConformanceTests
         Assert.Equal(VerificationOutcome.NotPerformed, Outcome(report, "collectionSignature"));
     }
 
-    [Fact]
+    [FixtureFact("record-legacy")]
     public async Task Orbitals_pinned_root_der_matches_root_pem_and_verifies_the_legacy_record()
     {
         var infoJson = await File.ReadAllTextAsync(Path.Combine(FixturesDirectory, "orbital-info.json"));
@@ -57,7 +57,7 @@ public sealed class LegacyRecordConformanceTests
         Assert.Equal(VerificationOutcome.Passed, Outcome(report, "certificateChain"));
     }
 
-    [Fact]
+    [FixtureFact("record-legacy")]
     public async Task A_tampered_image_signature_byte_fails_on_the_legacy_record()
     {
         var record = await LoadRecordAsync();

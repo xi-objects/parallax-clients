@@ -13,7 +13,7 @@ public sealed class LiveRecordConformanceTests
     private readonly IAttributionVerifier _verifier = new AttributionVerifier();
     private readonly ITrustRootReader _reader = new TrustRootReader();
 
-    [Fact]
+    [FixtureFact("record")]
     public async Task The_real_record_passes_every_performed_check_under_its_own_pinned_root()
     {
         var record = await LoadRecordAsync();
@@ -32,7 +32,7 @@ public sealed class LiveRecordConformanceTests
         Assert.Equal(VerificationOutcome.NotRecomputable, Outcome(report, "manifestHash:xi-manifest"));
     }
 
-    [Fact]
+    [FixtureFact("record")]
     public async Task Orbitals_pinned_root_der_matches_root_pem_and_verifies_the_record()
     {
         var infoJson = await File.ReadAllTextAsync(Path.Combine(FixturesDirectory, "orbital-info.json"));
@@ -51,7 +51,7 @@ public sealed class LiveRecordConformanceTests
         Assert.Equal(VerificationOutcome.Passed, Outcome(report, "certificateChain"));
     }
 
-    [Fact]
+    [FixtureFact("record")]
     public async Task A_wrong_pinned_root_fails_the_certificate_chain_on_the_real_record()
     {
         var record = await LoadRecordAsync();
@@ -62,7 +62,7 @@ public sealed class LiveRecordConformanceTests
         Assert.Equal(VerificationOutcome.Failed, Outcome(report, "certificateChain"));
     }
 
-    [Fact]
+    [FixtureFact("record")]
     public async Task Flipping_one_byte_of_the_c2pa_payload_fails_its_manifest_hash()
     {
         var record = await LoadRecordAsync();

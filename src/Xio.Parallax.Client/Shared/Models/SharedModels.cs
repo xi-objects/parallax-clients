@@ -22,6 +22,22 @@ public sealed record ParallaxClientOptions
     /// than guessing at limits the OpenAPI document does not declare.
     /// </summary>
     public UploadBatching? Batching { get; init; }
+
+    /// <summary>
+    /// Prints every member except <see cref="AccountToken"/> and <see cref="AdminKey"/>, so
+    /// <see cref="ToString"/> (and the compiler-synthesised record equality diagnostics that
+    /// call it) never surfaces either secret.
+    /// </summary>
+    /// <param name="builder">The builder the record's <see cref="ToString"/> writes into.</param>
+    /// <returns>Always true, so the base member list is printed after these fields.</returns>
+    private bool PrintMembers(StringBuilder builder)
+    {
+        builder.Append("BaseAddress = ").Append(BaseAddress);
+        builder.Append(", AccountToken = [redacted]");
+        builder.Append(", AdminKey = [redacted]");
+        builder.Append(", Batching = ").Append(Batching);
+        return true;
+    }
 }
 
 /// <summary>

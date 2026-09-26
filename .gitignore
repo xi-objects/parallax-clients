@@ -1,6 +1,6 @@
 # secrets and per-machine settings
 .mcp.json
-.claude/settings.local.json
+.claude/
 
 # .NET
 bin/
@@ -26,3 +26,7 @@ artifacts/
 
 # local inputs for the examples: tokens and URLs, never tracked (.env.example names them)
 .env
+
+# CLAUDE.md and fixtures/ are local-only: kept on disk, never tracked
+CLAUDE.md
+fixtures/

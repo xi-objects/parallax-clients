@@ -16,7 +16,7 @@ public sealed class LookupRecordConformanceTests
     private readonly IAttributionVerifier _verifier = new AttributionVerifier();
     private readonly ITrustRootReader _reader = new TrustRootReader();
 
-    [Fact]
+    [FixtureFact("lookup")]
     public async Task A_manifestless_production_record_has_no_collection_to_sign_and_fails_only_the_chain_against_the_dev_root()
     {
         var record = await LoadRecordAsync();

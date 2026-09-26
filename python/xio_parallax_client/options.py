@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +27,7 @@ class ParallaxClientOptions:
     `register_batch`/`lookup_batch` and is never defaulted to a guessed value.
     """
 
-    account_token: str | None = None
-    admin_key: str | None = None
+    account_token: str | None = field(default=None, repr=False)
+    admin_key: str | None = field(default=None, repr=False)
     base_url: str = "https://api.parallax.xiobjects.com"
     batching: UploadBatching | None = None

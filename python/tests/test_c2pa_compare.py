@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import blake3
+import pytest
 from xio_parallax_client import (
     C2paCarrier,
     C2paComparisonOutcome,
@@ -19,6 +20,11 @@ from xio_parallax_client.generated.models.published_record_response import Publi
 from .carriers import synthetic_store
 
 _FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "record"
+
+pytestmark = pytest.mark.skipif(
+    not _FIXTURE_DIR.is_dir(),
+    reason="fixtures/record is not present: a local capture, not part of the repository",
+)
 
 
 def _record(manifests: list[dict[str, Any]], outcome: str = "published") -> dict[str, Any]:
