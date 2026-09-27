@@ -5,5 +5,6 @@
     <Project Path="examples/dotnet/GettingStarted/GettingStarted.csproj" />
     <Project Path="examples/dotnet/RegisterBatch/RegisterBatch.csproj" />
     <Project Path="examples/dotnet/C2paRoundTrip/C2paRoundTrip.csproj" />
+    <Project Path="examples/dotnet/SequenceFromImages/SequenceFromImages.csproj" />
   </Folder>
 </Solution>
