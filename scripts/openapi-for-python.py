@@ -40,9 +40,10 @@ def _add_missing_path_parameters(path: str, item: dict, op: dict) -> None:
     missing = [name for name in template_names if name not in declared]
     if not missing:
         return
+    # PC-110: rework - append in template order rather than inserting at 0, which reversed it
     params = op.setdefault("parameters", [])
     for name in missing:
-        params.insert(0, {"name": name, "in": "path", "required": True, "schema": {"type": "string"}})
+        params.append({"name": name, "in": "path", "required": True, "schema": {"type": "string"}})
 
 
 src, dst = sys.argv[1], sys.argv[2]

@@ -90,7 +90,24 @@ def test_path_item_level_declaration_is_also_respected(tmp_path: Path) -> None:
     assert path_names == ["frameId"]
 
 
-def test_every_sequence_operation_is_generated(tmp_path: Path) -> None:
+_METHODS = ("get", "post", "put", "delete", "patch")
+
+
+def _sequence_operation_count(doc: dict) -> int:
+    """PC-110: rework - counts operations on `/sequences...` paths in the given document."""
+    return sum(
+        1
+        for path, item in doc["paths"].items()
+        if "/sequences" in path
+        for method in item
+        if method in _METHODS
+    )
+
+
+def test_reshaped_document_declares_every_sequence_path_parameter(tmp_path: Path) -> None:
+    """PC-110: rework - renamed from test_every_sequence_operation_is_generated: this checks the
+    reshaped document's declarations, not what openapi-python-client actually generates from it
+    (see test_generated_sequence_module_count_matches_document below for that)."""
     repo_root = _SCRIPT_PATH.parents[1]
     doc = json.loads((repo_root / "openapi" / "v1.json").read_text(encoding="utf-8"))
     out = _reshape(doc, tmp_path)
@@ -98,9 +115,23 @@ def test_every_sequence_operation_is_generated(tmp_path: Path) -> None:
         if "/sequences" not in path:
             continue
         for method in item:
-            if method not in ("get", "post", "put", "delete", "patch"):
+            if method not in _METHODS:
                 continue
             template_names = set(re.findall(r"\{([^}]+)\}", path))
             reshaped_params = out["paths"][path][method].get("parameters", [])
             declared = {p["name"] for p in reshaped_params if p["in"] == "path"}
             assert template_names <= declared, f"{method} {path} missing {template_names - declared}"
+
+
+def test_generated_sequence_module_count_matches_document() -> None:
+    """PC-110: rework - the generated module count for `api/sequences` equals the number of
+    `/sequences...` operations in the pinned document. Module names are openapi-python-client's own
+    naming, derived from a dependency this repo does not carry (invoked only through `uvx`), so a
+    per-operation module name is not derived here; this checks the count instead."""
+    repo_root = _SCRIPT_PATH.parents[1]
+    doc = json.loads((repo_root / "openapi" / "v1.json").read_text(encoding="utf-8"))
+    sequences_dir = repo_root / "python" / "xio_parallax_client" / "generated" / "api" / "sequences"
+    generated_modules = [
+        p for p in sequences_dir.iterdir() if p.suffix == ".py" and p.name != "__init__.py"
+    ]
+    assert len(generated_modules) == _sequence_operation_count(doc)
