@@ -1,6 +1,5 @@
-// PC-105: the stand-in for the ingestion that comes later - a directory of image files as one
-// sequence's frame source, registered through the one-call conversation, then a round-trip
-// look-up of its first image. Proves ISequenceFrameSource is enough for a real registration.
+// A directory of image files as one sequence's frame source, registered through the one-call
+// conversation, then a round-trip look-up of its first image.
 //
 // Environment:
 //   PARALLAX_BASE_URL                the API's base URL (defaults to https://api.parallax.xiobjects.com)

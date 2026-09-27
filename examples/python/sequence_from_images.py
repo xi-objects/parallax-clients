@@ -16,8 +16,6 @@ Environment:
 Run from the repository root: uv run python examples/python/sequence_from_images.py
 """
 
-# PC-115: the Python mirror of examples/dotnet/SequenceFromImages
-
 from __future__ import annotations
 
 import os
