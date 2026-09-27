@@ -51,6 +51,7 @@ from ._layout import (
     PRESENCE_FLAGS_OFFSET,
     PREV_OR_RANGE_FROM_OFFSET,
     RESERVED_OFFSET,
+    SEQUENCE_ID_LENGTH,
     SEQUENCE_ID_OFFSET,
     SOURCE_TIME_OFFSET,
 )
@@ -122,7 +123,8 @@ def _read_fields(frame: bytes, bucket_count: int) -> HeaderFields:
         frame[FRAME_TYPE_OFFSET],
         frame[PRESENCE_FLAGS_OFFSET],
         reserved == bytes(len(reserved)),
-        UUID(bytes=frame[SEQUENCE_ID_OFFSET : SEQUENCE_ID_OFFSET + 16]),
+        # PC-107: rework - the declared sequence-id length, not a repeated literal
+        UUID(bytes=frame[SEQUENCE_ID_OFFSET : SEQUENCE_ID_OFFSET + SEQUENCE_ID_LENGTH]),
         frame_id,
         prev_or_from,
         next_or_to,

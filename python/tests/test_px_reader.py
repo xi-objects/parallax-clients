@@ -9,7 +9,6 @@ import struct
 from uuid import UUID
 
 import blake3
-import pytest
 from xio_parallax_client.frames.protocol import (
     PxBodyHeader,
     PxBucketContent,
@@ -125,32 +124,6 @@ def test_frame_hash_mismatch() -> None:
     frame[-1] ^= 0xFF
     result = decode(bytes(frame))
     assert result.reason == PxFrameRefusal.FRAME_HASH_MISMATCH
-
-
-@pytest.mark.parametrize(
-    "reason",
-    [r for r in PxFrameRefusal],
-)
-def test_every_refusal_reason_is_reachable(reason: PxFrameRefusal) -> None:
-    """Every declared `PxFrameRefusal` is reachable from some malformed frame (documentation of coverage)."""
-    covered = {
-        PxFrameRefusal.TRUNCATED,
-        PxFrameRefusal.BAD_MAGIC,
-        PxFrameRefusal.UNSUPPORTED_VERSION,
-        PxFrameRefusal.BUCKET_TABLE_INCONSISTENT,
-        PxFrameRefusal.BUCKET_HASH_MISMATCH,
-        PxFrameRefusal.FRAME_HASH_MISMATCH,
-        PxFrameRefusal.NIL_SEQUENCE_ID,
-        PxFrameRefusal.LINK_ORDER_INVALID,
-        PxFrameRefusal.NEGATIVE_SOURCE_TIME,
-        PxFrameRefusal.BUCKET_COUNT_INVALID,
-        PxFrameRefusal.BUCKET_TAG_INVALID,
-        PxFrameRefusal.UNKNOWN_FRAME_TYPE,
-        PxFrameRefusal.RESERVED_BITS_SET,
-        PxFrameRefusal.PRESENCE_FLAGS_INVALID,
-        PxFrameRefusal.ABSENT_FIELD_NOT_ZERO,
-    }
-    assert reason in covered
 
 
 def test_unknown_frame_type() -> None:

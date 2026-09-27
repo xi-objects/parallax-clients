@@ -22,6 +22,7 @@ from ._layout import (
     HASH_LENGTH,
     LEGAL_PRESENCE_FLAGS,
     MAX_BUCKET_TAG_BYTE,
+    MAX_U16,
     MAX_U32,
     MIN_BUCKET_TAG_BYTE,
     RESERVED_PRESENCE_FLAG_BITS,
@@ -94,8 +95,9 @@ def check_header(fields: HeaderFields) -> RuleViolation | None:
     if fields.source_time_offset_microseconds < 0:
         return RuleViolation(PxFrameRefusal.NEGATIVE_SOURCE_TIME, "the source time offset is negative")
 
+    # PC-107: rework - the declared bucket-count width, not the literal 0xFFFF
     count_valid = (
-        1 <= fields.bucket_count <= 0xFFFF if frame_type == PxFrameType.BODY else fields.bucket_count == 0
+        1 <= fields.bucket_count <= MAX_U16 if frame_type == PxFrameType.BODY else fields.bucket_count == 0
     )
     if not count_valid:
         return RuleViolation(PxFrameRefusal.BUCKET_COUNT_INVALID, f"{frame_type.name} cannot carry {fields.bucket_count} buckets")
@@ -126,6 +128,11 @@ def check_bucket_table(placements: Sequence[BucketPlacement], frame_length: int)
         if not (1 <= placement.length <= MAX_U32):
             return RuleViolation(
                 PxFrameRefusal.BUCKET_TABLE_INCONSISTENT, f"bucket {index} length {placement.length} is outside 1-{MAX_U32}"
+            )
+        # PC-107: rework - refuse an offset the wire's u32 field cannot hold, before it reaches struct.pack_into
+        if not (0 <= placement.offset <= MAX_U32):
+            return RuleViolation(
+                PxFrameRefusal.BUCKET_TABLE_INCONSISTENT, f"bucket {index} offset {placement.offset} is outside 0-{MAX_U32}"
             )
         if placement.offset != expected_offset:
             return RuleViolation(

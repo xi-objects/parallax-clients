@@ -29,6 +29,7 @@ from ._layout import (
     BUCKET_COUNT_OFFSET,
     BUCKET_ENTRY_LENGTH,
     BUCKET_TABLE_OFFSET,
+    BUCKET_TAG_LENGTH,
     ENTRY_HASH_OFFSET,
     ENTRY_LENGTH_OFFSET,
     ENTRY_OFFSET_OFFSET,
@@ -45,6 +46,7 @@ from ._layout import (
     NEXT_OR_RANGE_TO_OFFSET,
     PRESENCE_FLAGS_OFFSET,
     PREV_OR_RANGE_FROM_OFFSET,
+    SEQUENCE_ID_LENGTH,
     SEQUENCE_ID_OFFSET,
     SOURCE_TIME_OFFSET,
 )
@@ -142,7 +144,8 @@ def _write_header(frame: bytearray, fields: HeaderFields) -> None:
     struct.pack_into("<H", frame, FORMAT_VERSION_OFFSET, FORMAT_VERSION)
     frame[FRAME_TYPE_OFFSET] = fields.frame_type
     frame[PRESENCE_FLAGS_OFFSET] = fields.presence_flags
-    frame[SEQUENCE_ID_OFFSET : SEQUENCE_ID_OFFSET + 16] = fields.sequence_id.bytes
+    # PC-107: rework - the declared sequence-id length, not a repeated literal
+    frame[SEQUENCE_ID_OFFSET : SEQUENCE_ID_OFFSET + SEQUENCE_ID_LENGTH] = fields.sequence_id.bytes
     struct.pack_into("<q", frame, FRAME_ID_OFFSET, fields.frame_id)
     struct.pack_into("<q", frame, PREV_OR_RANGE_FROM_OFFSET, fields.prev_or_range_from)
     struct.pack_into("<q", frame, NEXT_OR_RANGE_TO_OFFSET, fields.next_or_range_to)
@@ -152,7 +155,8 @@ def _write_header(frame: bytearray, fields: HeaderFields) -> None:
 
 def _write_row(frame: bytearray, row_start: int, tag: str, placement: BucketPlacement, bucket_hash: bytes) -> None:
     """One row's tag, offset, length and hash."""
-    frame[row_start + ENTRY_TAG_OFFSET : row_start + ENTRY_TAG_OFFSET + 4] = tag.encode("ascii")
+    # PC-107: rework - the declared bucket-tag length, not a repeated literal
+    frame[row_start + ENTRY_TAG_OFFSET : row_start + ENTRY_TAG_OFFSET + BUCKET_TAG_LENGTH] = tag.encode("ascii")
     struct.pack_into("<I", frame, row_start + ENTRY_OFFSET_OFFSET, placement.offset)
     struct.pack_into("<I", frame, row_start + ENTRY_LENGTH_OFFSET, placement.length)
     frame[row_start + ENTRY_HASH_OFFSET : row_start + ENTRY_HASH_OFFSET + HASH_LENGTH] = bucket_hash

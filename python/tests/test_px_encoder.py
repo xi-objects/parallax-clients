@@ -33,10 +33,12 @@ from xio_parallax_client.frames.pure._layout import (
     FRAME_TYPE_OFFSET,
     HEADER_LENGTH,
     MAGIC,
+    MAX_U32,
     PRESENCE_FLAGS_OFFSET,
     SEQUENCE_ID_OFFSET,
 )
 from xio_parallax_client.frames.pure._reader import decode
+from xio_parallax_client.frames.pure._rules import BucketPlacement, check_bucket_table
 
 _SEQUENCE_ID = UUID("12345678-1234-5678-1234-567812345678")
 
@@ -171,6 +173,16 @@ def test_encode_refuses_a_64_bit_overflow_naming_the_field(
     with pytest.raises(ValueError, match=field) as excinfo:
         encode(header, buckets)
     assert "64-bit" in str(excinfo.value)
+
+
+# PC-107: rework - the bucket-table check refuses an offset the wire's u32 field cannot hold, not only its length
+def test_check_bucket_table_refuses_an_out_of_range_offset() -> None:
+    """A bucket placement whose offset exceeds u32 is refused BUCKET_TABLE_INCONSISTENT, never a struct.error."""
+    placement = BucketPlacement(offset=MAX_U32 + 1, length=1)
+    violation = check_bucket_table([placement], frame_length=MAX_U32 + 100)
+    assert violation is not None
+    assert violation.reason == PxFrameRefusal.BUCKET_TABLE_INCONSISTENT
+    assert str(MAX_U32 + 1) in violation.detail
 
 
 def test_encoded_frame_re_decodes_byte_identical() -> None:
