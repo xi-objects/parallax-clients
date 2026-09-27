@@ -16,6 +16,14 @@ namespace Xio.Parallax.Client.Generated.Models
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The callCount property</summary>
         public int? CallCount { get; set; }
+        /// <summary>The limits property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::Xio.Parallax.Client.Generated.Models.AccountStatsLimitsResponse? Limits { get; set; }
+#nullable restore
+#else
+        public global::Xio.Parallax.Client.Generated.Models.AccountStatsLimitsResponse Limits { get; set; }
+#endif
         /// <summary>The lookups property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -58,6 +66,7 @@ namespace Xio.Parallax.Client.Generated.Models
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "callCount", n => { CallCount = n.GetIntValue(); } },
+                { "limits", n => { Limits = n.GetObjectValue<global::Xio.Parallax.Client.Generated.Models.AccountStatsLimitsResponse>(global::Xio.Parallax.Client.Generated.Models.AccountStatsLimitsResponse.CreateFromDiscriminatorValue); } },
                 { "lookups", n => { Lookups = n.GetObjectValue<global::Xio.Parallax.Client.Generated.Models.AccountStatsGrantResponse>(global::Xio.Parallax.Client.Generated.Models.AccountStatsGrantResponse.CreateFromDiscriminatorValue); } },
                 { "registrations", n => { Registrations = n.GetObjectValue<global::Xio.Parallax.Client.Generated.Models.AccountStatsGrantResponse>(global::Xio.Parallax.Client.Generated.Models.AccountStatsGrantResponse.CreateFromDiscriminatorValue); } },
             };
@@ -70,6 +79,7 @@ namespace Xio.Parallax.Client.Generated.Models
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("callCount", CallCount);
+            writer.WriteObjectValue<global::Xio.Parallax.Client.Generated.Models.AccountStatsLimitsResponse>("limits", Limits);
             writer.WriteObjectValue<global::Xio.Parallax.Client.Generated.Models.AccountStatsGrantResponse>("lookups", Lookups);
             writer.WriteObjectValue<global::Xio.Parallax.Client.Generated.Models.AccountStatsGrantResponse>("registrations", Registrations);
             writer.WriteAdditionalData(AdditionalData);

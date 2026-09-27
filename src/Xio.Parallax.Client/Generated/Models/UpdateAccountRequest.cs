@@ -9,17 +9,13 @@ namespace Xio.Parallax.Client.Generated.Models
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class AccountResponse : IAdditionalDataHolder, IParsable
+    public partial class UpdateAccountRequest : IAdditionalDataHolder, IParsable
     #pragma warning restore CS1591
     {
         /// <summary>Not enforced yet (S17).</summary>
         public int? AcceptedUploadRate { get; set; }
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
-        /// <summary>The createdAt property</summary>
-        public DateTimeOffset? CreatedAt { get; set; }
-        /// <summary>The id property</summary>
-        public Guid? Id { get; set; }
         /// <summary>Not enforced yet (S17).</summary>
         public int? InFlightAllowance { get; set; }
         /// <summary>The lookupGrant property</summary>
@@ -46,14 +42,6 @@ namespace Xio.Parallax.Client.Generated.Models
         public int? MaxQueryImagesPerLookupSlot { get; set; }
         /// <summary>The maxRequestBytes property</summary>
         public long? MaxRequestBytes { get; set; }
-        /// <summary>The name property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public string? Name { get; set; }
-#nullable restore
-#else
-        public string Name { get; set; }
-#endif
         /// <summary>The registrationGrant property</summary>
         public int? RegistrationGrant { get; set; }
         /// <summary>The registrationSlotAbsoluteTtl property</summary>
@@ -66,30 +54,22 @@ namespace Xio.Parallax.Client.Generated.Models
         public TimeSpan? SequenceIdleTtl { get; set; }
         /// <summary>The sequencesEnabled property</summary>
         public bool? SequencesEnabled { get; set; }
-        /// <summary>The status property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public string? Status { get; set; }
-#nullable restore
-#else
-        public string Status { get; set; }
-#endif
         /// <summary>
-        /// Instantiates a new <see cref="global::Xio.Parallax.Client.Generated.Models.AccountResponse"/> and sets the default values.
+        /// Instantiates a new <see cref="global::Xio.Parallax.Client.Generated.Models.UpdateAccountRequest"/> and sets the default values.
         /// </summary>
-        public AccountResponse()
+        public UpdateAccountRequest()
         {
             AdditionalData = new Dictionary<string, object>();
         }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
-        /// <returns>A <see cref="global::Xio.Parallax.Client.Generated.Models.AccountResponse"/></returns>
+        /// <returns>A <see cref="global::Xio.Parallax.Client.Generated.Models.UpdateAccountRequest"/></returns>
         /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
-        public static global::Xio.Parallax.Client.Generated.Models.AccountResponse CreateFromDiscriminatorValue(IParseNode parseNode)
+        public static global::Xio.Parallax.Client.Generated.Models.UpdateAccountRequest CreateFromDiscriminatorValue(IParseNode parseNode)
         {
             if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
-            return new global::Xio.Parallax.Client.Generated.Models.AccountResponse();
+            return new global::Xio.Parallax.Client.Generated.Models.UpdateAccountRequest();
         }
         /// <summary>
         /// The deserialization information for the current model
@@ -100,8 +80,6 @@ namespace Xio.Parallax.Client.Generated.Models
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "acceptedUploadRate", n => { AcceptedUploadRate = n.GetIntValue(); } },
-                { "createdAt", n => { CreatedAt = n.GetDateTimeOffsetValue(); } },
-                { "id", n => { Id = n.GetGuidValue(); } },
                 { "inFlightAllowance", n => { InFlightAllowance = n.GetIntValue(); } },
                 { "lookupGrant", n => { LookupGrant = n.GetIntValue(); } },
                 { "lookupSlotAbsoluteTtl", n => { LookupSlotAbsoluteTtl = n.GetTimeSpanValue(); } },
@@ -115,14 +93,12 @@ namespace Xio.Parallax.Client.Generated.Models
                 { "maxQueryImagesPerLookupRequest", n => { MaxQueryImagesPerLookupRequest = n.GetIntValue(); } },
                 { "maxQueryImagesPerLookupSlot", n => { MaxQueryImagesPerLookupSlot = n.GetIntValue(); } },
                 { "maxRequestBytes", n => { MaxRequestBytes = n.GetLongValue(); } },
-                { "name", n => { Name = n.GetStringValue(); } },
                 { "registrationGrant", n => { RegistrationGrant = n.GetIntValue(); } },
                 { "registrationSlotAbsoluteTtl", n => { RegistrationSlotAbsoluteTtl = n.GetTimeSpanValue(); } },
                 { "registrationSlotIdleTtl", n => { RegistrationSlotIdleTtl = n.GetTimeSpanValue(); } },
                 { "sequenceAbsoluteTtl", n => { SequenceAbsoluteTtl = n.GetTimeSpanValue(); } },
                 { "sequenceIdleTtl", n => { SequenceIdleTtl = n.GetTimeSpanValue(); } },
                 { "sequencesEnabled", n => { SequencesEnabled = n.GetBoolValue(); } },
-                { "status", n => { Status = n.GetStringValue(); } },
             };
         }
         /// <summary>
@@ -133,8 +109,6 @@ namespace Xio.Parallax.Client.Generated.Models
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("acceptedUploadRate", AcceptedUploadRate);
-            writer.WriteDateTimeOffsetValue("createdAt", CreatedAt);
-            writer.WriteGuidValue("id", Id);
             writer.WriteIntValue("inFlightAllowance", InFlightAllowance);
             writer.WriteIntValue("lookupGrant", LookupGrant);
             writer.WriteTimeSpanValue("lookupSlotAbsoluteTtl", LookupSlotAbsoluteTtl);
@@ -148,14 +122,12 @@ namespace Xio.Parallax.Client.Generated.Models
             writer.WriteIntValue("maxQueryImagesPerLookupRequest", MaxQueryImagesPerLookupRequest);
             writer.WriteIntValue("maxQueryImagesPerLookupSlot", MaxQueryImagesPerLookupSlot);
             writer.WriteLongValue("maxRequestBytes", MaxRequestBytes);
-            writer.WriteStringValue("name", Name);
             writer.WriteIntValue("registrationGrant", RegistrationGrant);
             writer.WriteTimeSpanValue("registrationSlotAbsoluteTtl", RegistrationSlotAbsoluteTtl);
             writer.WriteTimeSpanValue("registrationSlotIdleTtl", RegistrationSlotIdleTtl);
             writer.WriteTimeSpanValue("sequenceAbsoluteTtl", SequenceAbsoluteTtl);
             writer.WriteTimeSpanValue("sequenceIdleTtl", SequenceIdleTtl);
             writer.WriteBoolValue("sequencesEnabled", SequencesEnabled);
-            writer.WriteStringValue("status", Status);
             writer.WriteAdditionalData(AdditionalData);
         }
     }
