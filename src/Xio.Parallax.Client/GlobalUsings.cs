@@ -43,6 +43,8 @@ global using Xio.Parallax.Client.Multipart.Services;
 global using Xio.Parallax.Client.Problems;
 // PC-102: the Sequences domain's models, referenced across Models and Services
 global using Xio.Parallax.Client.Sequences.Models;
+// PC-103: SequenceFrameEncoder, composed by the sequence route members on ParallaxClient
+global using Xio.Parallax.Client.Sequences.Services;
 global using Xio.Parallax.Client.Shared;
 global using Xio.Parallax.Client.Shared.Models;
 global using Xio.Parallax.Client.Slots.Models;

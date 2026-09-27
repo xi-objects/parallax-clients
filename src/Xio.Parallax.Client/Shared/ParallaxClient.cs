@@ -50,13 +50,15 @@ public sealed partial class ParallaxClient : IDisposable
     /// <summary>The generated API client, wired with this client's base address and authentication.</summary>
     public ParallaxApiClient Api { get; }
 
+    // PC-103: also disposes the sequence frame encoder's lazily-built Common provider
     /// <summary>
-    /// Disposes the request adapter, and the <see cref="HttpClient"/> this client created; does
-    /// nothing to an <see cref="HttpClient"/> the caller supplied.
+    /// Disposes the request adapter, the sequence frame encoder, and the <see cref="HttpClient"/>
+    /// this client created; does nothing to an <see cref="HttpClient"/> the caller supplied.
     /// </summary>
     public void Dispose()
     {
         _requestAdapter.Dispose();
+        _sequenceFrameEncoder.Dispose();
         if (_ownsHttpClient)
         {
             _httpClient.Dispose();

@@ -18,7 +18,11 @@ internal static class MultipartRequestSender
     /// <param name="factory">The factory that deserializes the response model.</param>
     /// <param name="errorMapping">The error factories mapping, matching the endpoint's declared responses.</param>
     /// <param name="cancellationToken">Cancels the send.</param>
+    /// <param name="headers">
+    /// Extra request headers to attach, such as a sequence's ticket. Left null, only Accept is sent.
+    /// </param>
     /// <returns>The deserialized response, or null on an empty body.</returns>
+    // PC-103: an optional headers argument, so the sequence ticket travels through this one sender
     internal static async Task<T?> PostAsync<T>(
         IRequestAdapter requestAdapter,
         string urlTemplate,
@@ -26,7 +30,8 @@ internal static class MultipartRequestSender
         MultipartFormDataContent content,
         ParsableFactory<T> factory,
         Dictionary<string, ParsableFactory<IParsable>> errorMapping,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? headers = null)
         where T : IParsable
     {
         ArgumentNullException.ThrowIfNull(requestAdapter);
@@ -35,6 +40,14 @@ internal static class MultipartRequestSender
         {
             var requestInfo = new RequestInformation(Method.POST, urlTemplate, pathParameters);
             requestInfo.Headers.TryAdd("Accept", "application/json");
+            if (headers is not null)
+            {
+                foreach (var header in headers)
+                {
+                    requestInfo.Headers.TryAdd(header.Key, header.Value);
+                }
+            }
+
             var bodyBytes = await content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
             var contentType = content.Headers.ContentType?.ToString() ?? "multipart/form-data";
             using var bodyStream = new MemoryStream(bodyBytes);
