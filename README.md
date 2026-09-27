@@ -273,7 +273,7 @@ is the design of record.
 
 The Python PX Frame codec's conformance suite runs against test vectors vendored, unmodified,
 from `xio_parallax_common` at a pinned commit (`python/tests/vectors/px-frame/`, refreshed with
-`scripts/vendor-px-vectors.sh`); they are XI Objects' own test material, redistributed as-is and
+`scripts/vendor-px-vectors.sh <checkout> <sha>`); they are XI Objects' own test material, redistributed as-is and
 not under this repository's MIT license — see `python/tests/vectors/px-frame/VECTORS.md`.
 
 ## Publishing
