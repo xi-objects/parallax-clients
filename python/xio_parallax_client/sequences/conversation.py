@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from ..generated.models.sequence_verdict_response import SequenceVerdictResponse
 
 #: A frame id predicate: `True` when a frame the linker yields is one this seal actually uploads.
+#: PC-114: rework - async_conversation.py imports this and the four names below rather than copying them.
 _Selects = Callable[[int], bool]
 
 

@@ -10,14 +10,20 @@ preferred when a given object satisfies both).
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from ..frames.protocol import PxGapRange
 from ..frames.source import AsyncSequenceFrameSource, SequenceFrameSource
 from ..problems import ParallaxClientError
 from .async_routes import AsyncSequenceRoutes
+
+# PC-114: rework - imported from conversation.py rather than copied, so there is one definition of each
+from .conversation import (
+    _gap_ranges,
+    _refuse_unless_exactly_one_of_open_and_existing,
+    _select_every_frame,
+    _Selects,
+    _SourceTail,
+)
 from .encoding import SequenceFrameEncoder
 from .errors import SequenceCommitError, SequenceVerdictError
 from .linker import link_frames, link_frames_async
@@ -33,39 +39,10 @@ from .wire import OUTCOME_INCOMPLETE, STATE_COMMITTED, STATE_OPEN, STATE_SEALED
 
 if TYPE_CHECKING:
     from ..generated.models.sequence_commit_response import SequenceCommitResponse
-    from ..generated.models.sequence_gaps_response import SequenceGapsResponse
     from ..generated.models.sequence_verdict_response import SequenceVerdictResponse
-
-#: A frame id predicate: `True` when a frame the linker yields is one this seal actually uploads.
-_Selects = Callable[[int], bool]
 
 #: Either flavour of frame source `register_sequence` accepts; an async one is preferred when both.
 AnySequenceFrameSource = SequenceFrameSource | AsyncSequenceFrameSource
-
-
-# PC-114: the last BODY id and the END id the linker derived after reading the whole source
-@dataclass(frozen=True, slots=True)
-class _SourceTail:
-    """The chain's last BODY id and the END id the linker derived after it, for a fresh seal."""
-
-    last_body_id: int
-    end_frame_id: int
-
-
-def _refuse_unless_exactly_one_of_open_and_existing(options: SequenceRegisterOptions) -> None:
-    """Raise `ValueError` naming `open` and `existing` unless exactly one of them is set."""
-    if (options.open is None) == (options.existing is None):
-        raise ValueError("exactly one of open and existing must be set")
-
-
-def _select_every_frame(frame_id: int) -> bool:
-    """A fresh open selects every frame the linker yields; only a resume filters."""
-    return True
-
-
-def _gap_ranges(response: SequenceGapsResponse) -> tuple[PxGapRange, ...]:
-    """The gaps a `SequenceGapsResponse` carries, as `PxGapRange`s with 64-bit fields as `int`."""
-    return tuple(PxGapRange(int(gap.from_), int(gap.to)) for gap in response.gaps)
 
 
 class AsyncSequenceConversation(AsyncSequenceRoutes):
