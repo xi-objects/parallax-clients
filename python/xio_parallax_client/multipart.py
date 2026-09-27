@@ -13,6 +13,9 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import Protocol, runtime_checkable
+
+import httpx
 
 _KIND_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
@@ -95,3 +98,37 @@ def build_upload_parts(items: Sequence[tuple[Sequence[ManifestPart], ImageUpload
 def build_lookup_parts(images: Sequence[ImageUpload]) -> list[MultipartPart]:
     """Build the parts for a look-up upload: images only, with no manifests and any part name."""
     return [("image", (image.file_name, image.data, image.content_type)) for image in images]
+
+
+# PC-112: what a sequence-frame part builder needs from an encoded frame, decoupled from its owner
+@runtime_checkable
+class SequenceFramePart(Protocol):
+    """What `build_sequence_frame_parts` reads off an encoded frame: its id and its wire bytes."""
+
+    frame_id: int
+    data: bytes
+
+
+# PC-112: one file part per frame, as the frames route sends them
+def build_sequence_frame_parts(frames: Sequence[SequenceFramePart]) -> list[MultipartPart]:
+    """Build one `application/octet-stream` file part per frame, part name and file name its id, in order."""
+    parts: list[MultipartPart] = []
+    for frame in frames:
+        name = str(frame.frame_id)
+        parts.append((name, (f"{name}.px", frame.data, "application/octet-stream")))
+    return parts
+
+
+# PC-112: the whole multipart body's exact byte length, as httpx would build and send it
+def measure_multipart(parts: Sequence[MultipartPart]) -> int:
+    """The exact byte length of the multipart body httpx sends for `parts`.
+
+    Every part's bytes, part headers, boundaries and the closing delimiter are counted, read from
+    an `httpx.Request` built over the same parts (httpx's boundary is always 32 hex characters, so
+    the length does not depend on which boundary it drew).
+    """
+    request = httpx.Request("POST", "https://sequences.invalid/measure", files=list(parts))
+    content_length = request.headers.get("Content-Length")
+    if content_length is None:
+        raise ValueError("a multipart body could not compute its own length")
+    return int(content_length)
