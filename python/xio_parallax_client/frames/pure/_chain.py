@@ -23,8 +23,7 @@ from xio_parallax_client.frames.protocol import (
 )
 
 from ._chain_rules import ChainNode, check_rules, to_node
-
-_HASH_LENGTH = 32
+from ._layout import HASH_LENGTH as _HASH_LENGTH  # PC-107: rework - the one declared hash length, not a copy
 
 
 def build_chain(members: Collection[PxChainMember]) -> PxChainBuildResult:
