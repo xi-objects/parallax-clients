@@ -1,0 +1,8 @@
+{
+  "expect": "accepted",
+  "type": "END",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "60",
+  "prev": "50",
+  "frameHash": "7ff1ffb3895210c197dae88672a20d8ece3239ddc4f87f669fd79aaef8f0e2ad"
+}

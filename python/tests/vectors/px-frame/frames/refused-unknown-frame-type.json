@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "UnknownFrameType",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "b4ba4322cdf334296c0b840dbea6179e24adf3c9253f4cd17826e2da072d5ab0"
+}

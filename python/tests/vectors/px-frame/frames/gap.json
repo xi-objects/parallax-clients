@@ -1,0 +1,9 @@
+{
+  "expect": "accepted",
+  "type": "GAP",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "30",
+  "rangeFrom": "30",
+  "rangeTo": "35",
+  "frameHash": "e54fc16d2ae5950bb8386ca015fb197e0d07bda945b3555de397f68813d2bb40"
+}

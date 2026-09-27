@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "BadMagic",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "42cd01b6d6e1df0185aa0a1b4959cb7770fc85de75c78d453b4be8cc47207b62"
+}

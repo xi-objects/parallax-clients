@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "ReservedBitsSet",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "6dd4442574467900d8f4e1f0bc736a8ac02ddbcf7fcacf965999a99a1f84c0f2"
+}

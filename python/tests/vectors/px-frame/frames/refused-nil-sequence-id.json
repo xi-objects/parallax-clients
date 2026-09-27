@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "NilSequenceId",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "c3f3b4be55706c4ca59c63c5a8550a8ed9af21258e01d0897ac16fa21e7ebb69"
+}

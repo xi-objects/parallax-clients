@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "NegativeSourceTime",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "1c03f20bcbd77b81e1f47561776bb38d85eaadc5e4f7c1b67b1ad0d1057b6b97"
+}

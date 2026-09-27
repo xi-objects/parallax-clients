@@ -1,0 +1,17 @@
+{
+  "expect": "accepted",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "prev": "0",
+  "next": "20",
+  "sourceTimeOffsetMicroseconds": "1500000",
+  "buckets": [
+    {
+      "tag": "IMAG",
+      "length": 8,
+      "hash": "277bb8774dbdd387e2287eb528035c1f9d37b4691c5200a8edfbebac2cfb3c33"
+    }
+  ],
+  "frameHash": "a1e5d6ce3d9bd45ab378b4322d8d63f8f5e9513fa897c35987f9fd8c2c717ac5"
+}

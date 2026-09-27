@@ -1,2 +1,5 @@
 # pin LF line endings repo-wide, as the sibling does
 * text=auto eol=lf
+
+# PC-109: PX Frame vectors are opaque binary frames, never line-ending normalized
+*.pxf binary

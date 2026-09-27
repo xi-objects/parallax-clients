@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "BucketHashMismatch",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "37b7f5c20e1b419409808307e9042a9ac3cdcbe5c355c4217d10b0d6a95aa229"
+}
