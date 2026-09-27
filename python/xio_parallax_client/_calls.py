@@ -15,7 +15,13 @@ from . import problems
 from .generated.client import AuthenticatedClient
 from .generated.models import PublishedRecordOutcome, PublishedRecordResponse, SlotProgressResponse
 from .options import ParallaxClientOptions
-from .slots import RecordWaitOptions, is_record_outcome_terminal, next_poll_delay
+from .slots import (
+    RecordWaitOptions,
+    RegisterBatchOptions,
+    is_progress_terminal,
+    is_record_outcome_terminal,
+    next_poll_delay,
+)
 
 ProgressCallback = Callable[[SlotProgressResponse], None]
 
@@ -93,6 +99,65 @@ async def _poll_for_record_async(
             return record
         if elapsed >= options.poll_timeout:
             raise _record_wait_timeout(original_image_hash, elapsed, options, record.outcome)
+        wait = min(delay, options.poll_timeout - elapsed)
+        await asyncio.sleep(wait)
+        elapsed += wait
+        delay = next_poll_delay(delay, options.poll_timeout)
+
+
+# PC-113: moved from ParallaxClient._poll_progress so client.py stays under 300 lines
+def _poll_slot_progress(
+    fetch: Callable[[], Any],
+    options: RegisterBatchOptions,
+    on_progress: ProgressCallback | None,
+) -> SlotProgressResponse:
+    """Shared body of `ParallaxClient.register_batch`'s poll: poll `fetch` until no entry is `retry`.
+
+    Raises `ParallaxClientError` once `options.poll_timeout` elapses with entries still `retry`.
+    """
+    delay = options.poll_interval
+    elapsed = 0.0
+    while True:
+        response = fetch()
+        problems.raise_for_problem(response)
+        progress = _parsed(response)
+        if on_progress is not None:
+            on_progress(progress)
+        if is_progress_terminal(progress):
+            return progress
+        if elapsed >= options.poll_timeout:
+            raise problems.ParallaxClientError(
+                f"polling timed out after {elapsed:.3f}s (poll_timeout={options.poll_timeout}s) "
+                "with entries still in state 'retry'"
+            )
+        wait = min(delay, options.poll_timeout - elapsed)
+        time.sleep(wait)
+        elapsed += wait
+        delay = next_poll_delay(delay, options.poll_timeout)
+
+
+# PC-113: async mirror of `_poll_slot_progress`, for `AsyncParallaxClient.register_batch`
+async def _poll_slot_progress_async(
+    fetch: Callable[[], Awaitable[Any]],
+    options: RegisterBatchOptions,
+    on_progress: ProgressCallback | None,
+) -> SlotProgressResponse:
+    """Async mirror of `_poll_slot_progress`."""
+    delay = options.poll_interval
+    elapsed = 0.0
+    while True:
+        response = await fetch()
+        problems.raise_for_problem(response)
+        progress = _parsed(response)
+        if on_progress is not None:
+            on_progress(progress)
+        if is_progress_terminal(progress):
+            return progress
+        if elapsed >= options.poll_timeout:
+            raise problems.ParallaxClientError(
+                f"polling timed out after {elapsed:.3f}s (poll_timeout={options.poll_timeout}s) "
+                "with entries still in state 'retry'"
+            )
         wait = min(delay, options.poll_timeout - elapsed)
         await asyncio.sleep(wait)
         elapsed += wait

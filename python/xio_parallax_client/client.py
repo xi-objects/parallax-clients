@@ -13,13 +13,14 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Callable, Sequence
-from typing import Any
 
 import httpx
 
 from . import multipart, problems
 from . import slots as slots_module
-from ._calls import ProgressCallback, T, _build_api, _parsed, _poll_for_record, _require_batching
+from ._calls import ProgressCallback, T, _build_api, _parsed, _poll_for_record, _poll_slot_progress, _require_batching
+from .frames.binding import resolve_frame_codec
+from .frames.protocol import PxFrameCodec
 from .generated.api.lookup import (
     get_lookup_slots_lookup_slot_id_progress,
     get_lookup_slots_lookup_slot_id_results,
@@ -46,11 +47,11 @@ from .generated.models import (
     PublishedRecordsResponse,
     RegisterSingleResponse,
     ResumeRequestBody,
-    SlotProgressResponse,
     SlotUploadResponse,
 )
 from .multipart import ImageUpload, ManifestPart
 from .options import ParallaxClientOptions
+from .sequences.routes import SequenceRoutes
 from .slots import (
     LookupBatchOptions,
     LookupBatchResult,
@@ -61,17 +62,25 @@ from .slots import (
 )
 
 
-class ParallaxClient:
+class ParallaxClient(SequenceRoutes):
     """Synchronous client for the XI Parallax REST API.
 
-    Wraps the generated `AuthenticatedClient` (`.api`) with the three things a generator cannot
-    give: multipart parts named `manifest[<kind>]`, typed `ParallaxProblem` refusals, and the slot
-    conversations as one call each.
+    Wraps the generated `AuthenticatedClient` (`.api`) with the things a generator cannot give:
+    multipart parts named `manifest[<kind>]`, typed `ParallaxProblem` refusals, the slot
+    conversations as one call each, and the sequence route members (`SequenceRoutes`).
     """
 
-    def __init__(self, options: ParallaxClientOptions, httpx_client: httpx.Client | None = None) -> None:
+    # PC-113: frame_codec resolved once, through resolve_frame_codec, and held as client.frame_codec
+    def __init__(
+        self,
+        options: ParallaxClientOptions,
+        httpx_client: httpx.Client | None = None,
+        *,
+        frame_codec: PxFrameCodec | None = None,
+    ) -> None:
         self.options = options
         self.api = _build_api(options)
+        self.frame_codec = resolve_frame_codec(frame_codec)
         if httpx_client is not None:
             self.api.set_httpx_client(httpx_client)
 
@@ -178,7 +187,7 @@ class ParallaxClient:
         )
         commit = _parsed(committed)
 
-        final_progress = self._poll_progress(
+        final_progress = _poll_slot_progress(
             lambda: get_slots_slot_id_progress.sync_detailed(slot_id=slot_id, client=self.api), options, on_progress
         )
 
@@ -270,30 +279,3 @@ class ParallaxClient:
         if 200 <= int(response.status_code) < 300:
             return response
         raise problems.problem_from_response(response)
-
-    def _poll_progress(
-        self,
-        fetch: Callable[[], Any],
-        options: RegisterBatchOptions,
-        on_progress: ProgressCallback | None,
-    ) -> SlotProgressResponse:
-        """Poll `fetch` with exponential backoff until no entry is `retry`, or raise on timeout."""
-        delay = options.poll_interval
-        elapsed = 0.0
-        while True:
-            response = fetch()
-            problems.raise_for_problem(response)
-            progress = _parsed(response)
-            if on_progress is not None:
-                on_progress(progress)
-            if slots_module.is_progress_terminal(progress):
-                return progress
-            if elapsed >= options.poll_timeout:
-                raise problems.ParallaxClientError(
-                    f"polling timed out after {elapsed:.3f}s (poll_timeout={options.poll_timeout}s) "
-                    "with entries still in state 'retry'"
-                )
-            wait = min(delay, options.poll_timeout - elapsed)
-            time.sleep(wait)
-            elapsed += wait
-            delay = slots_module.next_poll_delay(delay, options.poll_timeout)
