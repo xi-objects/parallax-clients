@@ -12,6 +12,7 @@ from typing import cast
 
 if TYPE_CHECKING:
   from ..models.account_stats_grant_response import AccountStatsGrantResponse
+  from ..models.account_stats_limits_response import AccountStatsLimitsResponse
 
 
 
@@ -28,11 +29,13 @@ class AccountStatsResponse:
             registrations (AccountStatsGrantResponse):
             lookups (AccountStatsGrantResponse):
             call_count (int | str):
+            limits (AccountStatsLimitsResponse):
      """
 
     registrations: AccountStatsGrantResponse
     lookups: AccountStatsGrantResponse
     call_count: int | str
+    limits: AccountStatsLimitsResponse
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -41,12 +44,15 @@ class AccountStatsResponse:
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.account_stats_grant_response import AccountStatsGrantResponse # noqa: PLC0415
+        from ..models.account_stats_limits_response import AccountStatsLimitsResponse # noqa: PLC0415
         registrations = self.registrations.to_dict()
 
         lookups = self.lookups.to_dict()
 
         call_count: int | str
         call_count = self.call_count
+
+        limits = self.limits.to_dict()
 
 
         field_dict: dict[str, Any] = {}
@@ -55,6 +61,7 @@ class AccountStatsResponse:
             "registrations": registrations,
             "lookups": lookups,
             "callCount": call_count,
+            "limits": limits,
         })
 
         return field_dict
@@ -64,6 +71,7 @@ class AccountStatsResponse:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.account_stats_grant_response import AccountStatsGrantResponse # noqa: PLC0415
+        from ..models.account_stats_limits_response import AccountStatsLimitsResponse # noqa: PLC0415
         d = dict(src_dict)
         registrations = AccountStatsGrantResponse.from_dict(d.pop("registrations"))
 
@@ -81,10 +89,16 @@ class AccountStatsResponse:
         call_count = _parse_call_count(d.pop("callCount"))
 
 
+        limits = AccountStatsLimitsResponse.from_dict(d.pop("limits"))
+
+
+
+
         account_stats_response = cls(
             registrations=registrations,
             lookups=lookups,
             call_count=call_count,
+            limits=limits,
         )
 
 

@@ -10,9 +10,7 @@ from .. import types
 
 from ..types import UNSET, Unset
 
-from ..types import File, FileTypes
 from ..types import UNSET, Unset
-from io import BytesIO
 from typing import cast
 
 
@@ -20,24 +18,23 @@ from typing import cast
 
 
 
-T = TypeVar("T", bound="PostRegistrationsBody")
+T = TypeVar("T", bound="PostSequencesBody")
 
 
 
 @_attrs_define
-class PostRegistrationsBody:
+class PostSequencesBody:
     """ 
         Attributes:
-            manifestkind (list[str] | Unset): One manifest the image carries. Manifest kind must be 1 to 64 characters of
-                A-Z, a-z, 0-9, '.', '_' or '-'. The part's own Content-Type gives the manifest's form, with no default. One part
-                is bounded by SlotUpload:MaxManifestBytes and one image carries at most SlotUpload:MaxManifestsPerImage of them.
-            image (File | Unset): The one image to register. Its content type must be one of SlotUpload:AllowedContentTypes;
-                one image is bounded by the calling account's maxImageBytes and the whole request by its maxRequestBytes, both
-                set by the admin.
+            expected_size (str | Unset): Advisory expected frame count; when present, a positive integer.
+            manifestkind (list[str] | Unset): A manifest attached to the sequence. Manifest kind must be 1 to 64 characters
+                of A-Z, a-z, 0-9, '.', '_' or '-'. The part's own Content-Type gives the manifest's form, with no default. One
+                part is bounded by SlotUpload:MaxManifestBytes and one image carries at most SlotUpload:MaxManifestsPerImage of
+                them.
      """
 
+    expected_size: str | Unset = UNSET
     manifestkind: list[str] | Unset = UNSET
-    image: File | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -45,15 +42,12 @@ class PostRegistrationsBody:
 
 
     def to_dict(self) -> dict[str, Any]:
+        expected_size = self.expected_size
+
         manifestkind: list[str] | Unset = UNSET
         if not isinstance(self.manifestkind, Unset):
             manifestkind = self.manifestkind
 
-
-
-        image: FileTypes | Unset = UNSET
-        if not isinstance(self.image, Unset):
-            image = self.image.to_tuple()
 
 
 
@@ -61,10 +55,10 @@ class PostRegistrationsBody:
         field_dict.update(self.additional_properties)
         field_dict.update({
         })
+        if expected_size is not UNSET:
+            field_dict["expectedSize"] = expected_size
         if manifestkind is not UNSET:
             field_dict["manifest[<kind>]"] = manifestkind
-        if image is not UNSET:
-            field_dict["image"] = image
 
         return field_dict
 
@@ -72,15 +66,15 @@ class PostRegistrationsBody:
     def to_multipart(self) -> types.RequestFiles:
         files: types.RequestFiles = []
 
+        if not isinstance(self.expected_size, Unset):
+            files.append(("expectedSize", (None, str(self.expected_size).encode(), "text/plain")))
+
+
+
         if not isinstance(self.manifestkind, Unset):
             for manifestkind_item_element in self.manifestkind:
                 files.append(("manifest[<kind>]", (None, str(manifestkind_item_element).encode(), "text/plain")))
 
-
-
-
-        if not isinstance(self.image, Unset):
-            files.append(("image", self.image.to_tuple()))
 
 
 
@@ -96,29 +90,19 @@ class PostRegistrationsBody:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
+        expected_size = d.pop("expectedSize", UNSET)
+
         manifestkind = cast(list[str], d.pop("manifest[<kind>]", UNSET))
 
 
-        _image = d.pop("image", UNSET)
-        image: File | Unset
-        if isinstance(_image,  Unset):
-            image = UNSET
-        else:
-            image = File(
-             payload = BytesIO(_image)
-        )
-
-
-
-
-        post_registrations_body = cls(
+        post_sequences_body = cls(
+            expected_size=expected_size,
             manifestkind=manifestkind,
-            image=image,
         )
 
 
-        post_registrations_body.additional_properties = d
-        return post_registrations_body
+        post_sequences_body.additional_properties = d
+        return post_sequences_body
 
     @property
     def additional_keys(self) -> list[str]:

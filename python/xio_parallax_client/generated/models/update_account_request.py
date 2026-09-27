@@ -8,7 +8,6 @@ from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
-from ..types import UNSET, Unset
 from typing import cast
 
 
@@ -16,15 +15,14 @@ from typing import cast
 
 
 
-T = TypeVar("T", bound="CreateAccountRequest")
+T = TypeVar("T", bound="UpdateAccountRequest")
 
 
 
 @_attrs_define
-class CreateAccountRequest:
+class UpdateAccountRequest:
     """ 
         Attributes:
-            name (str):
             registration_grant (int | str):
             lookup_grant (int | str):
             registration_slot_idle_ttl (str):
@@ -44,10 +42,9 @@ class CreateAccountRequest:
             max_frame_bytes (int | str): Not enforced yet (S17).
             accepted_upload_rate (int | str): Not enforced yet (S17).
             in_flight_allowance (int | str): Not enforced yet (S17).
-            sequences_enabled (bool | Unset):  Default: False.
+            sequences_enabled (bool):
      """
 
-    name: str
     registration_grant: int | str
     lookup_grant: int | str
     registration_slot_idle_ttl: str
@@ -67,7 +64,7 @@ class CreateAccountRequest:
     max_frame_bytes: int | str
     accepted_upload_rate: int | str
     in_flight_allowance: int | str
-    sequences_enabled: bool | Unset = False
+    sequences_enabled: bool
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -75,8 +72,6 @@ class CreateAccountRequest:
 
 
     def to_dict(self) -> dict[str, Any]:
-        name = self.name
-
         registration_grant: int | str
         registration_grant = self.registration_grant
 
@@ -134,7 +129,6 @@ class CreateAccountRequest:
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({
-            "name": name,
             "registrationGrant": registration_grant,
             "lookupGrant": lookup_grant,
             "registrationSlotIdleTtl": registration_slot_idle_ttl,
@@ -154,9 +148,8 @@ class CreateAccountRequest:
             "maxFrameBytes": max_frame_bytes,
             "acceptedUploadRate": accepted_upload_rate,
             "inFlightAllowance": in_flight_allowance,
+            "sequencesEnabled": sequences_enabled,
         })
-        if sequences_enabled is not UNSET:
-            field_dict["sequencesEnabled"] = sequences_enabled
 
         return field_dict
 
@@ -165,8 +158,6 @@ class CreateAccountRequest:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        name = d.pop("name")
-
         def _parse_registration_grant(data: object) -> int | str:
             return cast(int | str, data)
 
@@ -257,10 +248,9 @@ class CreateAccountRequest:
         in_flight_allowance = _parse_in_flight_allowance(d.pop("inFlightAllowance"))
 
 
-        sequences_enabled = d.pop("sequencesEnabled", UNSET)
+        sequences_enabled = d.pop("sequencesEnabled")
 
-        create_account_request = cls(
-            name=name,
+        update_account_request = cls(
             registration_grant=registration_grant,
             lookup_grant=lookup_grant,
             registration_slot_idle_ttl=registration_slot_idle_ttl,
@@ -284,8 +274,8 @@ class CreateAccountRequest:
         )
 
 
-        create_account_request.additional_properties = d
-        return create_account_request
+        update_account_request.additional_properties = d
+        return update_account_request
 
     @property
     def additional_keys(self) -> list[str]:

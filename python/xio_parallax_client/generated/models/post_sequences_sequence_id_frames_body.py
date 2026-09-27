@@ -20,24 +20,17 @@ from typing import cast
 
 
 
-T = TypeVar("T", bound="PostSlotsSlotIdUploadsBody")
+T = TypeVar("T", bound="PostSequencesSequenceIdFramesBody")
 
 
 
 @_attrs_define
-class PostSlotsSlotIdUploadsBody:
+class PostSequencesSequenceIdFramesBody:
     """ 
         Attributes:
-            manifestkind (list[str] | Unset): The manifests of the image part that follows. Manifest kind must be 1 to 64
-                characters of A-Z, a-z, 0-9, '.', '_' or '-'. The part's own Content-Type gives the manifest's form, with no
-                default. One part is bounded by SlotUpload:MaxManifestBytes and one image carries at most
-                SlotUpload:MaxManifestsPerImage of them.
-            image (list[File] | Unset): One image to register. Its content type must be one of
-                SlotUpload:AllowedContentTypes; one image is bounded by the calling account's maxImageBytes and the whole
-                request by its maxRequestBytes, both set by the admin.
+            image (list[File] | Unset): One PX BODY frame's own bytes.
      """
 
-    manifestkind: list[str] | Unset = UNSET
     image: list[File] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -46,12 +39,6 @@ class PostSlotsSlotIdUploadsBody:
 
 
     def to_dict(self) -> dict[str, Any]:
-        manifestkind: list[str] | Unset = UNSET
-        if not isinstance(self.manifestkind, Unset):
-            manifestkind = self.manifestkind
-
-
-
         image: list[FileTypes] | Unset = UNSET
         if not isinstance(self.image, Unset):
             image = []
@@ -67,8 +54,6 @@ class PostSlotsSlotIdUploadsBody:
         field_dict.update(self.additional_properties)
         field_dict.update({
         })
-        if manifestkind is not UNSET:
-            field_dict["manifest[<kind>]"] = manifestkind
         if image is not UNSET:
             field_dict["image"] = image
 
@@ -77,13 +62,6 @@ class PostSlotsSlotIdUploadsBody:
 
     def to_multipart(self) -> types.RequestFiles:
         files: types.RequestFiles = []
-
-        if not isinstance(self.manifestkind, Unset):
-            for manifestkind_item_element in self.manifestkind:
-                files.append(("manifest[<kind>]", (None, str(manifestkind_item_element).encode(), "text/plain")))
-
-
-
 
         if not isinstance(self.image, Unset):
             for image_item_element in self.image:
@@ -104,9 +82,6 @@ class PostSlotsSlotIdUploadsBody:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        manifestkind = cast(list[str], d.pop("manifest[<kind>]", UNSET))
-
-
         _image = d.pop("image", UNSET)
         image: list[File] | Unset = UNSET
         if _image is not UNSET:
@@ -121,14 +96,13 @@ class PostSlotsSlotIdUploadsBody:
                 image.append(image_item)
 
 
-        post_slots_slot_id_uploads_body = cls(
-            manifestkind=manifestkind,
+        post_sequences_sequence_id_frames_body = cls(
             image=image,
         )
 
 
-        post_slots_slot_id_uploads_body.additional_properties = d
-        return post_slots_slot_id_uploads_body
+        post_sequences_sequence_id_frames_body.additional_properties = d
+        return post_sequences_sequence_id_frames_body
 
     @property
     def additional_keys(self) -> list[str]:
