@@ -41,6 +41,8 @@ global using Xio.Parallax.Client.Multipart.Enums;
 global using Xio.Parallax.Client.Multipart.Models;
 global using Xio.Parallax.Client.Multipart.Services;
 global using Xio.Parallax.Client.Problems;
+// PC-104: ISequenceFrameSource, read by the sequence register conversation
+global using Xio.Parallax.Client.Sequences.Interfaces;
 // PC-102: the Sequences domain's models, referenced across Models and Services
 global using Xio.Parallax.Client.Sequences.Models;
 // PC-103: SequenceFrameEncoder, composed by the sequence route members on ParallaxClient

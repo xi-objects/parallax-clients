@@ -52,24 +52,26 @@ public sealed record SequenceRegisterOptions(TimeSpan PollInterval,
     /// </summary>
     public SequenceOpenRequest? Open { get; init; }
 
+    // PC-104: the sequence a first run opened, its handle and HEAD id, rather than a bare handle
     /// <summary>
-    /// An already-open or already-sealed sequence to resume. Exactly one of <see cref="Open"/> and
-    /// <see cref="Existing"/> is set; which one is validated once the conversation starts.
+    /// A sequence a first run opened, as <c>OpenSequenceAsync</c> answered it, to resume. Exactly one
+    /// of <see cref="Open"/> and <see cref="Existing"/> is set; which one is validated once the
+    /// conversation starts.
     /// </summary>
-    public SequenceHandle? Existing { get; init; }
+    public OpenedSequence? Existing { get; init; }
 }
 
-// PC-102: the outcome of the register conversation: the sequence, its verdict, its commit and its results
+// PC-104: the outcome of the register conversation, led by the opened sequence rather than a bare handle
 /// <summary>
 /// The outcome of registering a sequence: the sequence it ran in, the verdict the client sealed
-/// it on, its commit and its final results, and the errata every uploaded frame reported.
+/// it on, its commit and its final results, and the verdict's errata frames.
 /// </summary>
-/// <param name="Handle">The sequence the conversation ran in.</param>
+/// <param name="Sequence">The sequence the conversation ran in: its handle and its HEAD id.</param>
 /// <param name="Verdict">The verdict the sequence was sealed on.</param>
 /// <param name="Commit">The sequence's commit response.</param>
 /// <param name="Results">The sequence's final results.</param>
-/// <param name="Errata">Every per-frame errata this run's uploads reported.</param>
-public sealed record SequenceRegisterResult(SequenceHandle Handle,
+/// <param name="Errata">The verdict's errata frames: each frame id and the original image hash it matched.</param>
+public sealed record SequenceRegisterResult(OpenedSequence Sequence,
                                             SequenceVerdictResponse Verdict,
                                             SequenceCommitResponse Commit,
                                             SequenceResultsResponse Results,

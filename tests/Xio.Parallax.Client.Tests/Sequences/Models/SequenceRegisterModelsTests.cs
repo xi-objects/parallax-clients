@@ -50,6 +50,7 @@ public sealed class SequenceRegisterOptionsTests
         Assert.Equal("CommitAttempts", exception.ParamName);
     }
 
+    // PC-104: Existing is the OpenedSequence a first run answered, not a bare handle
     [Fact]
     public void Open_and_existing_are_both_left_null_by_default()
     {
@@ -58,7 +59,7 @@ public sealed class SequenceRegisterOptionsTests
         Assert.Null(options.Open);
         Assert.Null(options.Existing);
 
-        var resuming = options with { Existing = new SequenceHandle(Guid.NewGuid(), "t") };
+        var resuming = options with { Existing = new OpenedSequence(new SequenceHandle(Guid.NewGuid(), "t"), HeadFrameId: 0) };
 
         Assert.NotNull(resuming.Existing);
         Assert.Null(resuming.Open);
