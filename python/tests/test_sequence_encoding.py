@@ -12,6 +12,7 @@ from xio_parallax_client.frames.protocol import (
     PxBucketContent,
     PxFrame,
     PxFrameAccepted,
+    PxFrameEncodeError,
     PxFrameRefusal,
     PxFrameRefused,
     PxFrameType,
@@ -76,6 +77,22 @@ def test_encode_end_carries_no_buckets() -> None:
     assert header.frame_id == 10
     assert header.prev == 9
     assert buckets == ()
+
+
+# PC-112: rework - a codec refusal on encode_body is re-raised naming the frame id, not left bare
+def test_encode_body_names_the_frame_id_when_the_codec_refuses_it() -> None:
+    class RefusingCodec(FakeCodec):
+        """A `FakeCodec` whose `encode` always refuses, as the real codec would mid-stream."""
+
+        def encode(self, header, buckets):
+            raise PxFrameEncodeError(PxFrameRefusal.BUCKET_TAG_INVALID, "bucket 0 tag is not 4 bytes in 0x21-0x7E")
+
+    encoder = SequenceFrameEncoder(RefusingCodec())
+    bucket = PxBucketContent("IMAG", b"image-bytes")
+    frame_input = SequenceFrameInput(9, timedelta(0), (bucket,))
+
+    with pytest.raises(ValueError, match="frame 9: "):
+        encoder.encode_body(_SEQUENCE_ID, frame_input, prev=1, next_id=10)
 
 
 def test_decode_head_frame_id_returns_the_head_id() -> None:

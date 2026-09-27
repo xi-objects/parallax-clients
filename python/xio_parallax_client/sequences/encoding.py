@@ -17,6 +17,7 @@ from ..frames.protocol import (
     PxEndHeader,
     PxFrameAccepted,
     PxFrameCodec,
+    PxFrameEncodeError,
     PxFrameType,
     PxHeadHeader,
 )
@@ -34,12 +35,19 @@ class SequenceFrameEncoder:
         """Hold the codec every encode and decode call in this instance uses."""
         self._codec = codec
 
-    # PC-112: encodes one BODY frame carrying the source's buckets and the caller's derived links
+    # PC-112: rework - names the frame id when the codec refuses it, since input validation
+    # (SequenceFrameInput.__post_init__, PC-111) should have caught the offence first
     def encode_body(self, sequence_id: UUID, frame: SequenceFrameInput, prev: int, next_id: int) -> EncodedFrame:
-        """Encode one BODY frame: the input's buckets, under the given sequence id and derived links."""
+        """Encode one BODY frame: the input's buckets, under the given sequence id and derived links.
+
+        Raises `ValueError` naming `frame.frame_id` when the codec refuses the frame.
+        """
         offset_microseconds = frame.source_time_offset // _MICROSECOND
         header = PxBodyHeader(sequence_id, frame.frame_id, prev, next_id, offset_microseconds)
-        encoded = self._codec.encode(header, frame.buckets)
+        try:
+            encoded = self._codec.encode(header, frame.buckets)
+        except PxFrameEncodeError as error:
+            raise ValueError(f"frame {frame.frame_id}: {error}") from error
         return EncodedFrame(frame.frame_id, PxFrameType.BODY, encoded.frame, encoded.frame_hash)
 
     # PC-112: encodes the sealing END frame, which carries no buckets
