@@ -8,6 +8,9 @@ global using System.Linq;
 global using System.Net;
 global using System.Net.Http;
 global using System.Net.Http.Headers;
+// PC-117: reflection into SequenceFrameInput's backing field, to reach the encoder with a frame
+// its own validated constructor can no longer build
+global using System.Reflection;
 // PC-102: FakeSequenceFrameSource's [EnumeratorCancellation] parameter
 global using System.Runtime.CompilerServices;
 global using System.Security.Cryptography;

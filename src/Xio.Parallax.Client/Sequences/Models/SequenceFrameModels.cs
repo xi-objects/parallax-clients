@@ -1,26 +1,43 @@
 namespace Xio.Parallax.Client.Sequences.Models;
 
 // PC-102: one frame a source hands the client; the client derives its links, never the source
+// PC-117: rework - one explicit constructor so every bad field is checked and named together,
+// rather than the positional record's per-property initializers each throwing on the first offence
 /// <summary>
 /// One frame read from an <see cref="Interfaces.ISequenceFrameSource"/>: its id, its position
 /// within the source's own media, and the buckets it carries. The source owns <see cref="FrameId"/>
 /// but says nothing about prev or next; the client derives both from neighboring frames.
 /// </summary>
-/// <param name="FrameId">The frame's id, monotone along the chain; validated above zero.</param>
-/// <param name="SourceTimeOffset">The frame's position within its own media; validated non-negative.</param>
-/// <param name="Buckets">The frame's buckets, in table order; validated non-empty with no repeated tag.</param>
-public sealed record SequenceFrameInput(long FrameId,
-                                        TimeSpan SourceTimeOffset,
-                                        IReadOnlyList<PxBucketContent> Buckets)
+public sealed record SequenceFrameInput
 {
     /// <summary>The frame's id, monotone along the chain.</summary>
-    public long FrameId { get; } = ValidateFrameId(FrameId);
+    public long FrameId { get; }
 
     /// <summary>The frame's position within its own media.</summary>
-    public TimeSpan SourceTimeOffset { get; } = ValidateSourceTimeOffset(SourceTimeOffset);
+    public TimeSpan SourceTimeOffset { get; }
 
     /// <summary>The frame's buckets, in table order.</summary>
-    public IReadOnlyList<PxBucketContent> Buckets { get; } = ValidateBuckets(Buckets);
+    public IReadOnlyList<PxBucketContent> Buckets { get; }
+
+    // PC-117: refuses a non-positive id, a negative offset, no bucket, a repeated or malformed
+    // bucket tag, or empty bucket data, naming every one together in one refusal
+    /// <summary>Builds a frame input, validated above zero, non-negative, non-empty and well-formed.</summary>
+    /// <param name="frameId">The frame's id, monotone along the chain.</param>
+    /// <param name="sourceTimeOffset">The frame's position within its own media.</param>
+    /// <param name="buckets">The frame's buckets, in table order.</param>
+    public SequenceFrameInput(long frameId, TimeSpan sourceTimeOffset, IReadOnlyList<PxBucketContent> buckets)
+    {
+        ArgumentNullException.ThrowIfNull(buckets);
+        var errors = ValidateAll(frameId, sourceTimeOffset, buckets);
+        if (errors.Count > 0)
+        {
+            throw new ArgumentException(string.Join("; ", errors) + ".");
+        }
+
+        FrameId = frameId;
+        SourceTimeOffset = sourceTimeOffset;
+        Buckets = buckets;
+    }
 
     // PC-102: one image frame, the bytes under the format's declared image bucket tag
     /// <summary>Builds a frame carrying a single image bucket, under <see cref="PxFrameConstants.ImageBucketTag"/>.</summary>
@@ -33,34 +50,61 @@ public sealed record SequenceFrameInput(long FrameId,
         return new SequenceFrameInput(frameId, sourceTimeOffset, new[] { new PxBucketContent(PxFrameConstants.ImageBucketTag, imageBytes) });
     }
 
-    private static long ValidateFrameId(long frameId)
+    // PC-117: refuses every bad field together instead of stopping at the first one
+    private static List<string> ValidateAll(long frameId, TimeSpan sourceTimeOffset, IReadOnlyList<PxBucketContent> buckets)
     {
-        return frameId > 0
-            ? frameId
-            : throw new ArgumentException($"a frame id must be above zero; was {frameId}.", nameof(frameId));
-    }
+        var errors = new List<string>();
+        if (frameId <= 0)
+        {
+            errors.Add($"a frame id must be above zero; was {frameId}");
+        }
 
-    private static TimeSpan ValidateSourceTimeOffset(TimeSpan sourceTimeOffset)
-    {
-        return sourceTimeOffset >= TimeSpan.Zero
-            ? sourceTimeOffset
-            : throw new ArgumentException($"a source time offset must not be negative; was {sourceTimeOffset}.", nameof(sourceTimeOffset));
-    }
+        if (sourceTimeOffset < TimeSpan.Zero)
+        {
+            errors.Add($"a source time offset must not be negative; was {sourceTimeOffset}");
+        }
 
-    private static IReadOnlyList<PxBucketContent> ValidateBuckets(IReadOnlyList<PxBucketContent> buckets)
-    {
-        ArgumentNullException.ThrowIfNull(buckets);
         if (buckets.Count == 0)
         {
-            throw new ArgumentException("a frame needs at least one bucket.", nameof(buckets));
+            errors.Add("a frame needs at least one bucket");
+            return errors;
         }
 
-        if (buckets.Select(bucket => bucket.Tag).Distinct().Count() != buckets.Count)
+        var seen = new HashSet<PxBucketTag>();
+        var duplicates = new List<PxBucketTag>();
+        foreach (var bucket in buckets)
         {
-            throw new ArgumentException("a frame's buckets repeat a tag.", nameof(buckets));
+            if (!IsWellFormedTag(bucket.Tag))
+            {
+                errors.Add($"bucket tag '{bucket.Tag.Value}' must be exactly {PxFrameConstants.BucketTagLength} bytes in "
+                    + $"0x{PxFrameConstants.MinBucketTagByte:X2}-0x{PxFrameConstants.MaxBucketTagByte:X2}");
+            }
+
+            if (!seen.Add(bucket.Tag) && !duplicates.Contains(bucket.Tag))
+            {
+                duplicates.Add(bucket.Tag);
+            }
+
+            if (bucket.Data.IsEmpty)
+            {
+                errors.Add($"bucket '{bucket.Tag.Value}' has no data");
+            }
         }
 
-        return buckets;
+        foreach (var tag in duplicates)
+        {
+            errors.Add($"a frame's buckets repeat tag '{tag.Value}'");
+        }
+
+        return errors;
+    }
+
+    // PC-117: the shape itself, over Common's own PxFrameConstants, never a re-declared copy
+    private static bool IsWellFormedTag(PxBucketTag tag)
+    {
+        var value = tag.Value;
+        return value.Length == PxFrameConstants.BucketTagLength
+            && value.All(character => character >= PxFrameConstants.MinBucketTagByte && character <= PxFrameConstants.MaxBucketTagByte);
     }
 }
 

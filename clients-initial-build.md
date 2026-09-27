@@ -675,6 +675,8 @@ and acceptance criteria in full.
 - **PC-114** the one-call `register_sequence` conversation, sync and async, with resume.
 - **PC-115** the Python `sequence_from_images.py` example, mirroring .NET's.
 - **PC-116** this section, the README, and the version.
+- **PC-117** the .NET frame-input validation catches up: bucket tag and data checked up front with
+  every other frame-input field, and the encoder names the frame id when Common still refuses.
 
 ### what stays open
 

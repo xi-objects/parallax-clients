@@ -1,6 +1,7 @@
 namespace Xio.Parallax.Client.Tests.Sequences.Services;
 
 // PC-102: BODY/END round trip through the real Common encoder and decoder; HEAD id decode and refusal
+// PC-117: rework - an encode-time refusal from Common names the frame it refused
 public sealed class SequenceFrameEncoderTests : IDisposable
 {
     private readonly SequenceFrameEncoder _encoder = new();
@@ -55,6 +56,29 @@ public sealed class SequenceFrameEncoderTests : IDisposable
         Assert.Equal(9, header.FrameId);
         Assert.Equal(8, header.Prev);
         Assert.Empty(accepted.Value.Buckets);
+    }
+
+    // PC-117: a frame that reaches Common malformed despite SequenceFrameInput's own validation
+    // (built by reflection, since the public constructor now refuses it) is named by frame id
+    [Fact]
+    public async Task EncodeBodyAsync_names_the_frame_when_common_itself_refuses_it()
+    {
+        var frame = UnvalidatedFrameWithEmptyBucketData(5);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _encoder.EncodeBodyAsync(Guid.NewGuid(), frame, prev: 4, next: 6, CancellationToken.None));
+
+        Assert.StartsWith("frame 5: ", exception.Message);
+    }
+
+    // PC-117: bypasses SequenceFrameInput's own validation, past its public constructor, to reach
+    // the encoder with a frame Common itself still refuses, proving the encoder's own naming
+    private static SequenceFrameInput UnvalidatedFrameWithEmptyBucketData(long frameId)
+    {
+        var frame = SequenceFrameInput.ForImage(frameId, TimeSpan.Zero, new byte[] { 1 });
+        var field = typeof(SequenceFrameInput).GetField($"<{nameof(SequenceFrameInput.Buckets)}>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic);
+        field!.SetValue(frame, new[] { new PxBucketContent(new PxBucketTag("TEST"), ReadOnlyMemory<byte>.Empty) });
+        return frame;
     }
 
     [Fact]

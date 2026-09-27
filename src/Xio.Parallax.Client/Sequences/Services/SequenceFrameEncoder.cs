@@ -15,6 +15,8 @@ internal sealed class SequenceFrameEncoder : IDisposable
     private IXioPxFrameDecoder Decoder => _provider.Value.GetRequiredService<IXioPxFrameDecoder>();
 
     // PC-102: encodes one BODY frame carrying the source's buckets and the caller's derived links
+    // PC-117: rework - names the frame id when Common itself refuses the frame at encode time,
+    // since SequenceFrameInput's own validation (PC-117) should have caught the offence first
     /// <summary>Encodes one BODY frame: the input's buckets, under the given sequence id and links.</summary>
     /// <param name="sequenceId">The sequence the frame belongs to.</param>
     /// <param name="frame">The frame to encode, as the source gave it.</param>
@@ -27,7 +29,16 @@ internal sealed class SequenceFrameEncoder : IDisposable
         ArgumentNullException.ThrowIfNull(frame);
         var offsetMicroseconds = frame.SourceTimeOffset.Ticks / TimeSpan.TicksPerMicrosecond;
         var header = new PxBodyHeader(sequenceId, frame.FrameId, prev, next, offsetMicroseconds);
-        var response = await Encoder.EncodeAsync(new XioEncodePxFrameRequest(header, frame.Buckets), cancellationToken).ConfigureAwait(false);
+        EncodePxFrameResponse response;
+        try
+        {
+            response = await Encoder.EncodeAsync(new XioEncodePxFrameRequest(header, frame.Buckets), cancellationToken).ConfigureAwait(false);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidOperationException($"frame {frame.FrameId}: {exception.Message}", exception);
+        }
+
         return new EncodedFrame(frame.FrameId, PxFrameType.Body, response.Frame, response.FrameHash);
     }
 
