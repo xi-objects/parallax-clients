@@ -4,6 +4,8 @@
   <ItemGroup>
     <PackageVersion Include="Blake3" Version="2.2.1" />
     <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
+    <!-- PC-102: composes Xio.Parallax.Common; pinned to the version its Abstractions already resolve to -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Kiota.Bundle" Version="2.1.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="Xio.Parallax.Common" Version="0.1.1" />
