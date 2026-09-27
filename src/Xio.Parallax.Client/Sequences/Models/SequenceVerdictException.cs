@@ -1,9 +1,11 @@
 namespace Xio.Parallax.Client.Sequences.Models;
 
-// PC-102: a sealed sequence the client refuses to commit: not connected, or gaps remain
+// PC-102: a sealed sequence the client refuses to commit: not connected, gaps remain, or errata frames are named
 /// <summary>
-/// Thrown when a sequence's verdict, once sealed, is not committable: it is not connected, or it
-/// still names gaps. Its message names the gap count, the errata count and whether the sequence
+/// Thrown when a sequence's verdict, once sealed, is not committable: it is not connected, it
+/// still names gaps, or it names errata frames, which the server's commit refuses too. Nothing is
+/// committed; the sequence stays sealed for the caller to abandon or to resolve through take-down.
+/// Its message names the gap count, the errata count and whether the sequence
 /// is connected; it never names a ticket.
 /// </summary>
 public sealed class SequenceVerdictException : Exception

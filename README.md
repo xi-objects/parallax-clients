@@ -92,21 +92,25 @@ allowed) and its position within its own media (`SourceTimeOffset`); it says not
 links between frames — the client derives every frame's `prev` from the frame read immediately
 before it (the sequence's HEAD id for the first) and its `next` from the frame read immediately
 after it, buffering one frame of lookahead. `SequenceFrameInput.ForImage(frameId, offset,
-imageBytes)` builds a frame carrying a single image bucket.
+imageBytes)` builds a frame carrying a single image bucket. A source that yields an id not above the
+one before it is refused, naming the id, before that frame (or any batch holding it) is sent;
+batches before it may already have been uploaded, and re-sending them on a later run is harmless.
 
 `RegisterSequenceAsync(source, options, progress)` is the whole conversation in one call: open a
 sequence (or resume the one named by `options.Existing`), read `source`, encode and upload its
-frames in batches under `options.Batching` (`MaxRequestBytes`, `MaxFramesPerRequest` — both
-required, with no client-side default for either server cap), seal the sequence with an END
-frame, commit it (retrying an incomplete commit up to `options.CommitAttempts`, waiting
-`options.PollInterval` between attempts) and read its results. `progress`, when given, is
-reported with every verdict the conversation reads along the way.
+frames in batches under `options.Batching` (`MaxRequestBytes`, bounding each request's whole
+multipart body, and `MaxFramesPerRequest` — both required, with no client-side default for either
+server cap), seal the sequence with an END frame, commit it (retrying an incomplete commit up to
+`options.CommitAttempts`, waiting `options.PollInterval` between attempts) and read its results.
+`progress`, when given, is reported with every verdict the conversation reads along the way. A
+sealed verdict that is not connected, still has gaps or names errata frames throws
+`SequenceVerdictException` carrying the verdict, and nothing is committed: the sequence stays
+sealed for you to abandon or to resolve through take-down.
 
 ```csharp
-var opened = await client.OpenSequenceAsync(new SequenceOpenRequest(manifests, expectedSize: frameCount));
-var options = new SequenceRegisterOptions(TimeSpan.FromSeconds(1), commitAttempts: 5, batching)
+var options = new SequenceRegisterOptions(TimeSpan.FromSeconds(1), CommitAttempts: 5, batching)
 {
-    Open = new SequenceOpenRequest(manifests, expectedSize: frameCount),
+    Open = new SequenceOpenRequest(manifests, ExpectedSize: frameCount),
 };
 var result = await client.RegisterSequenceAsync(source, options, progress);
 Console.WriteLine($"{result.Results.SequenceHash}: {result.Results.Outcome}");
@@ -125,8 +129,9 @@ the typed problem the server answers, the same as any other refusal.
 `examples/dotnet/SequenceFromImages` is the stand-in for the ingestion that decodes a video into
 frames: it reads a directory of image files, in ordinal name order, as one sequence's frames
 (frame ids 1..n, each frame's source time offset the constant frame interval it is given),
-registers them through `RegisterSequenceAsync`, prints every verdict, the sequence hash, the
-outcome, the final size and any errata frames, then looks its first image up through `LookupAsync`
+refusing any file whose extension is not an image's, registers them through
+`RegisterSequenceAsync`, prints every verdict, the sequence hash, the outcome and the final size
+(or, on a refused verdict, its errata frames), then looks its first image up through `LookupAsync`
 to prove the round trip.
 
 ## The verifier

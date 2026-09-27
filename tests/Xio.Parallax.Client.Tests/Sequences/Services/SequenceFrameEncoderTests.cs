@@ -4,7 +4,8 @@ namespace Xio.Parallax.Client.Tests.Sequences.Services;
 public sealed class SequenceFrameEncoderTests : IDisposable
 {
     private readonly SequenceFrameEncoder _encoder = new();
-    private readonly ServiceProvider _referenceProvider = BuildReferenceProvider();
+    // PC-102: the reference provider comes from the shared Common composition
+    private readonly ServiceProvider _referenceProvider = CommonServiceProviderFactory.Build();
 
     private IXioPxFrameEncoder ReferenceEncoder => _referenceProvider.GetRequiredService<IXioPxFrameEncoder>();
 
@@ -87,13 +88,5 @@ public sealed class SequenceFrameEncoderTests : IDisposable
     {
         _encoder.Dispose();
         _referenceProvider.Dispose();
-    }
-
-    private static ServiceProvider BuildReferenceProvider()
-    {
-        var services = new ServiceCollection();
-        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddXioParallaxCommon();
-        return services.BuildServiceProvider();
     }
 }

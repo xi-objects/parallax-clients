@@ -46,6 +46,11 @@ public sealed record SequenceRegisterOptions(TimeSpan PollInterval,
         ? CommitAttempts
         : throw new ArgumentException($"CommitAttempts must be at least one; was {CommitAttempts}.", nameof(CommitAttempts));
 
+    // PC-102: Batching is required, refused as null naming it rather than failing after open
+    /// <summary>The operator-configured upload batching caps.</summary>
+    public SequenceBatching Batching { get; } = Batching
+        ?? throw new ArgumentNullException(nameof(Batching), "Batching is required; there is no default.");
+
     /// <summary>
     /// A new sequence to open, reading its frames from the start. Exactly one of <see cref="Open"/>
     /// and <see cref="Existing"/> is set; which one is validated once the conversation starts.
@@ -61,18 +66,17 @@ public sealed record SequenceRegisterOptions(TimeSpan PollInterval,
     public OpenedSequence? Existing { get; init; }
 }
 
-// PC-104: the outcome of the register conversation, led by the opened sequence rather than a bare handle
+// PC-104: the outcome of the register conversation, led by the opened sequence; no errata, which refuse before commit
 /// <summary>
 /// The outcome of registering a sequence: the sequence it ran in, the verdict the client sealed
-/// it on, its commit and its final results, and the verdict's errata frames.
+/// it on, its commit and its final results. A verdict naming errata frames never reaches here; it
+/// is refused with <see cref="SequenceVerdictException"/>, whose verdict carries them.
 /// </summary>
 /// <param name="Sequence">The sequence the conversation ran in: its handle and its HEAD id.</param>
 /// <param name="Verdict">The verdict the sequence was sealed on.</param>
 /// <param name="Commit">The sequence's commit response.</param>
 /// <param name="Results">The sequence's final results.</param>
-/// <param name="Errata">The verdict's errata frames: each frame id and the original image hash it matched.</param>
 public sealed record SequenceRegisterResult(OpenedSequence Sequence,
                                             SequenceVerdictResponse Verdict,
                                             SequenceCommitResponse Commit,
-                                            SequenceResultsResponse Results,
-                                            IReadOnlyList<SequenceErrataFrameResponse> Errata);
+                                            SequenceResultsResponse Results);

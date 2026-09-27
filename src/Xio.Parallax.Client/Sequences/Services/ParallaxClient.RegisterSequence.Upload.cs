@@ -5,7 +5,7 @@ namespace Xio.Parallax.Client;
 /// <summary>The upload and seal phases of <see cref="ParallaxClient.RegisterSequenceAsync"/>.</summary>
 public sealed partial class ParallaxClient
 {
-    // PC-104: uploads the selected frames, then END as its own batch, and reads the verdict it sealed on
+    // PC-104: uploads the selected frames, then END as its own batch, and takes the verdict the END batch answered
     private async Task<SequenceVerdictResponse> SealSequenceAsync(
         OpenedSequence sequence,
         ISequenceFrameSource source,
@@ -20,18 +20,23 @@ public sealed partial class ParallaxClient
         var sequenceId = sequence.Handle.SequenceId;
         var end = await _sequenceFrameEncoder.EncodeEndAsync(sequenceId, tail.EndFrameId, tail.LastBodyId, cancellationToken).ConfigureAwait(false);
         var sealing = await UploadSequenceFramesAsync(sequence.Handle, [end], cancellationToken).ConfigureAwait(false);
-        var verdict = sealing.Verdict ?? await GetSequenceProgressAsync(sequence.Handle, cancellationToken).ConfigureAwait(false);
+        var verdict = sealing.Verdict
+            ?? throw new ParallaxClientException($"The Parallax API admitted END frame {end.FrameId} without a verdict; the sequence did not seal.");
         progress?.Report(verdict);
         return verdict;
     }
 
-    // PC-104: streams the source through the linker, encodes and uploads the selected frames one batch at a time
+    // PC-104: streams the source through the linker, encodes and uploads the selected frames one batch at a time,
+    // each batch bounded by its whole multipart body
     /// <summary>
     /// Reads the whole source through the chain linker from the sequence's HEAD id, encodes each
     /// frame <paramref name="selects"/> keeps as a BODY with its derived links, and uploads them in
-    /// batches: a batch closes when the next frame would take it past either cap. A frame whose
-    /// bytes alone exceed <see cref="SequenceBatching.MaxRequestBytes"/> is refused before its batch
-    /// is sent. At most one batch plus the linker's one frame of lookahead is held at a time.
+    /// batches: a batch closes when the next frame would take it past either cap, the byte cap
+    /// counting the whole multipart body the batch sends (every part's bytes, part headers,
+    /// boundaries and the closing delimiter). A frame whose request alone would exceed
+    /// <see cref="SequenceBatching.MaxRequestBytes"/> is refused before it, or any batch holding
+    /// it, is sent; batches before it may already have gone. At most one batch plus the linker's
+    /// one frame of lookahead is held at a time.
     /// </summary>
     /// <returns>The last BODY id and the END id the linker derived, or null when the source yielded no frame.</returns>
     private async Task<SequenceSourceTail?> UploadSourceFramesAsync(
@@ -55,23 +60,23 @@ public sealed partial class ParallaxClient
             }
 
             var encoded = await _sequenceFrameEncoder.EncodeBodyAsync(sequenceId, frame, prev, next, cancellationToken).ConfigureAwait(false);
-            var size = (long)encoded.Bytes.Length;
-            if (size > batching.MaxRequestBytes)
+            var alone = MultipartRequestContent.MeasureSequenceFrames([encoded]);
+            if (alone > batching.MaxRequestBytes)
             {
                 throw new ArgumentException(
-                    $"frame {frame.FrameId} encodes to {size} bytes, above MaxRequestBytes {batching.MaxRequestBytes}.",
+                    $"frame {frame.FrameId} alone makes a {alone}-byte request, above MaxRequestBytes {batching.MaxRequestBytes}.",
                     nameof(source));
             }
 
-            if (batch.Count > 0 && (batch.Count + 1 > batching.MaxFramesPerRequest || batchBytes + size > batching.MaxRequestBytes))
+            var appended = MultipartRequestContent.MeasureSequenceFrames([encoded, encoded]) - alone;
+            if (batch.Count > 0 && (batch.Count + 1 > batching.MaxFramesPerRequest || batchBytes + appended > batching.MaxRequestBytes))
             {
                 await UploadSequenceFramesAsync(sequence.Handle, batch, cancellationToken).ConfigureAwait(false);
                 batch = new List<EncodedFrame>();
-                batchBytes = 0;
             }
 
+            batchBytes = batch.Count == 0 ? alone : batchBytes + appended;
             batch.Add(encoded);
-            batchBytes += size;
         }
 
         if (batch.Count > 0)

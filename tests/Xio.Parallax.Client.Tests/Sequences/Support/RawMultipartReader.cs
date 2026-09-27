@@ -1,11 +1,13 @@
 namespace Xio.Parallax.Client.Tests.Sequences.Support;
 
 // PC-103: reads a multipart body at byte level, so a binary frame part survives the round trip
+// PC-103: carries the part's Content-Disposition file name, so a test can assert a file part
 /// <summary>One part read back out of a raw multipart/form-data body, its bytes untouched.</summary>
 /// <param name="Name">The part's Content-Disposition name.</param>
+/// <param name="FileName">The part's Content-Disposition file name, or null when it is not a file part.</param>
 /// <param name="ContentType">The part's own Content-Type header, or null when it sent none.</param>
 /// <param name="Body">The part's raw body bytes, exactly as sent.</param>
-internal sealed record RawMultipartPart(string Name, string? ContentType, byte[] Body);
+internal sealed record RawMultipartPart(string Name, string? FileName, string? ContentType, byte[] Body);
 
 // PC-103: MultipartWireReader reads only headers as text, which corrupts a binary PX frame part;
 // this reader keeps every part's body as raw bytes, only decoding its own headers as ASCII
@@ -51,7 +53,7 @@ internal static class RawMultipartReader
             var contentType = ExtractContentType(headerText);
             var bodyStart = separatorIndex + HeaderBodySeparator.Length;
             var partBody = trimmed[bodyStart..];
-            parts.Add(new RawMultipartPart(name, contentType, partBody));
+            parts.Add(new RawMultipartPart(name, ExtractParameter(headerText, " filename="), contentType, partBody));
         }
 
         return parts;
@@ -135,9 +137,12 @@ internal static class RawMultipartReader
         return -1;
     }
 
-    private static string? ExtractNameParameter(string headerBlock)
+    // PC-103: the name parameter, through the shared parameter parse
+    private static string? ExtractNameParameter(string headerBlock) => ExtractParameter(headerBlock, " name=");
+
+    // PC-103: one Content-Disposition parameter by its marker, quoted or bare; the name reader's own parse, shared
+    private static string? ExtractParameter(string headerBlock, string marker)
     {
-        const string marker = " name=";
         var index = headerBlock.IndexOf(marker, StringComparison.Ordinal);
         if (index < 0)
         {

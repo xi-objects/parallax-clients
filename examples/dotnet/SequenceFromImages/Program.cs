@@ -5,7 +5,7 @@
 // Environment:
 //   PARALLAX_BASE_URL                the API's base URL (defaults to https://api.parallax.xiobjects.com)
 //   PARALLAX_TOKEN                   the account token (required)
-//   PARALLAX_IMAGES                  a directory of image files, read in ordinal name order (required)
+//   PARALLAX_IMAGES                  a directory of image files (png, jpg, jpeg, gif, webp, bmp only), read in ordinal name order (required)
 //   PARALLAX_FRAME_INTERVAL_MS       the constant interval, in milliseconds, between two frames' source time offsets (required)
 //   PARALLAX_MAX_REQUEST_BYTES       the operator's per-request byte cap (required; not in the document)
 //   PARALLAX_MAX_FRAMES_PER_REQUEST  the operator's per-request frame cap (required; not in the document)
@@ -35,6 +35,7 @@ var options = new SequenceRegisterOptions(TimeSpan.FromSeconds(1), 5, new Sequen
     Open = new SequenceOpenRequest(Array.Empty<ManifestPart>(), source.FrameCount),
 };
 
+// PC-105: a verdict the client refuses (not connected, gaps or errata) prints its errata frames; nothing was committed
 SequenceRegisterResult result;
 try
 {
@@ -45,16 +46,23 @@ catch (ParallaxProblemException problem)
     Console.Error.WriteLine($"sequence refused: {problem.Status} {problem.Slug}: {problem.Detail}");
     return 1;
 }
+catch (SequenceVerdictException refused)
+{
+    Console.Error.WriteLine($"sequence not committed: {refused.Message}");
+    foreach (var errata in refused.Verdict.Errata ?? [])
+    {
+        Console.Error.WriteLine($"  errata frame {errata.FrameId}: {errata.OriginalImageHash}");
+    }
+
+    return 1;
+}
 
 Console.WriteLine($"sequence hash: {result.Results.SequenceHash}");
 Console.WriteLine($"outcome: {result.Results.Outcome}");
 Console.WriteLine($"final size: {result.Results.FinalSize}");
-foreach (var errata in result.Errata)
-{
-    Console.WriteLine($"  errata frame {errata.FrameId}: {errata.OriginalImageHash}");
-}
 
-var firstImage = ImageUpload.FromFile(source.FirstPath, ContentTypeFor(source.FirstPath));
+// PC-105: the look-up's media type comes from the source's own extension map, which admitted the file
+var firstImage = ImageUpload.FromFile(source.FirstPath, DirectoryFrameSource.ContentTypeFor(source.FirstPath));
 var found = await client.LookupAsync(firstImage);
 Console.WriteLine($"lookup matched: {found.Matched}");
 
@@ -70,14 +78,3 @@ static string Required(string name)
 
     return value;
 }
-
-// PC-105: a minimal extension-to-media-type map for the round-trip look-up; unknown extensions fall back to a generic type
-static string ContentTypeFor(string path) => Path.GetExtension(path).ToLowerInvariant() switch
-{
-    ".png" => "image/png",
-    ".jpg" or ".jpeg" => "image/jpeg",
-    ".gif" => "image/gif",
-    ".webp" => "image/webp",
-    ".bmp" => "image/bmp",
-    _ => "application/octet-stream",
-};

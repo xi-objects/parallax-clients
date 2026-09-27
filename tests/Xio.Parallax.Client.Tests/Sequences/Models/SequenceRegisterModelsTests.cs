@@ -50,6 +50,15 @@ public sealed class SequenceRegisterOptionsTests
         Assert.Equal("CommitAttempts", exception.ParamName);
     }
 
+    // PC-102: a null Batching is refused naming it, before any conversation starts
+    [Fact]
+    public void Batching_is_required()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() => new SequenceRegisterOptions(TimeSpan.FromSeconds(1), 1, null!));
+
+        Assert.Equal("Batching", exception.ParamName);
+    }
+
     // PC-104: Existing is the OpenedSequence a first run answered, not a bare handle
     [Fact]
     public void Open_and_existing_are_both_left_null_by_default()

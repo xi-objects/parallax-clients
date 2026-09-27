@@ -1,13 +1,14 @@
 namespace Xio.Parallax.Client.Tests.Sequences.Services;
 
-// PC-103: UploadSequenceFramesAsync sends one octet-stream part per frame, in order, under the
+// PC-103: UploadSequenceFramesAsync sends one octet-stream file part per frame, in order, under the
 // ticket header; RemoveSequenceFrameAsync deletes one BODY member under the same header
 public sealed class ParallaxClientSequencesFramesTests : IDisposable
 {
     private readonly SequenceFrameEncoder _encoder = new();
 
+    // PC-103: each frame part is a file part, the only kind the server's frames reader admits
     [Fact]
-    public async Task UploadSequenceFramesAsync_SendsOneOctetStreamPartPerFrameInOrder_UnderTheTicketHeader()
+    public async Task UploadSequenceFramesAsync_SendsOneOctetStreamFilePartPerFrameInOrder_UnderTheTicketHeader()
     {
         var sequenceId = Guid.NewGuid();
         var handle = new SequenceHandle(sequenceId, "sequence-ticket-frames");
@@ -40,12 +41,14 @@ public sealed class ParallaxClientSequencesFramesTests : IDisposable
             part =>
             {
                 Assert.Equal("1", part.Name);
+                Assert.Equal("1.px", part.FileName);
                 Assert.Equal("application/octet-stream", part.ContentType);
                 Assert.Equal(frame1.Bytes.ToArray(), part.Body);
             },
             part =>
             {
                 Assert.Equal("2", part.Name);
+                Assert.Equal("2.px", part.FileName);
                 Assert.Equal("application/octet-stream", part.ContentType);
                 Assert.Equal(frame2.Bytes.ToArray(), part.Body);
             });

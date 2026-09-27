@@ -9,13 +9,13 @@ namespace Xio.Parallax.Client.Sequences.Services;
 /// </summary>
 internal static class SequenceChainLinker
 {
-    // PC-102: yields (frame, prev, next) in source order, refusing a non-monotone id before yielding past it
+    // PC-102: yields (frame, prev, next) in source order, refusing a non-monotone id before yielding the frame ahead of it
     /// <summary>
     /// Reads <paramref name="frames"/> and yields each one with its derived prev and next link.
     /// A frame whose id is not above the frame read immediately before it (or, for the first
     /// frame, not above <paramref name="headFrameId"/>) is refused with an
-    /// <see cref="ArgumentException"/> naming both ids, before anything past it is yielded. An
-    /// empty source yields nothing.
+    /// <see cref="ArgumentException"/> naming both ids, before the frame ahead of it is yielded,
+    /// so no link ever names the offending id. An empty source yields nothing.
     /// </summary>
     /// <param name="frames">The source's frames, in chain order.</param>
     /// <param name="headFrameId">The sequence's HEAD id, the first frame's prev.</param>
@@ -35,16 +35,16 @@ internal static class SequenceChainLinker
 
         var previousId = headFrameId;
         var current = enumerator.Current;
+        RefuseUnlessAbove(current.FrameId, previousId);
         while (await enumerator.MoveNextAsync().ConfigureAwait(false))
         {
             var next = enumerator.Current;
-            RefuseUnlessAbove(current.FrameId, previousId);
+            RefuseUnlessAbove(next.FrameId, current.FrameId);
             yield return (current, previousId, next.FrameId);
             previousId = current.FrameId;
             current = next;
         }
 
-        RefuseUnlessAbove(current.FrameId, previousId);
         yield return (current, previousId, current.FrameId + 1);
     }
 

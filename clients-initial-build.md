@@ -466,11 +466,12 @@ already-decoded image files as one sequence's frames.
   ticket }`. The account's `sequences_enabled` gate answers 403 otherwise.
 - Every other route carries the header `X-Sequence-Ticket: <ticket>` (required).
 - `POST /sequences/{id}/frames` (multipart: one or more file parts, any part name, each one PX
-  BODY or END frame's bytes as `application/octet-stream`; the whole request bounded by the
-  account's `maxRequestBytes`, 413 otherwise) -> 201 `SequenceFrameBatchResponse { frames
-  [{frameId, errata}], verdict? }`; the verdict is present when the batch sealed the sequence. All
-  or nothing. 409 for a state the sequence refuses, 422 when an image could not be checked, 503
-  when no engine is configured.
+  BODY or END frame's bytes as `application/octet-stream`; the server reads only parts whose
+  Content-Disposition carries a file name, in request order; the whole request's Content-Length
+  bounded by the account's `maxRequestBytes`, 413 otherwise) -> 201
+  `SequenceFrameBatchResponse { frames [{frameId, errata}], verdict? }`; the verdict is present
+  when the batch sealed the sequence. All or nothing. 409 for a state the sequence refuses, 422
+  when an image could not be checked, 503 when no engine is configured.
 - `DELETE /sequences/{id}/frames/{frameId}` -> 204 (open only).
 - `GET /sequences/{id}/gaps` -> `SequenceGapsResponse { gaps [{from, to, gapFrame}] }`.
 - `GET /sequences/{id}/progress` -> `SequenceVerdictResponse { state, framesReceived,
@@ -514,13 +515,15 @@ required options with no client-side default for any server cap.
    that puts the bytes under the image bucket tag. The source owns the ids (monotone, room
    allowed) and says nothing about links: the client derives prev from the previous frame it read
    (the HEAD's id for the first) and next from the following one (END's id for the last),
-   buffering one frame of lookahead. A source that yields a non-monotone id is refused before
-   anything is sent, naming the id.
+   buffering one frame of lookahead. A source that yields a non-monotone id is refused, naming the
+   id, before that frame (or any batch holding it) is sent; batches before it may already have
+   been uploaded, exact retransmits being harmless on a later run.
 3. **The route members** on `ParallaxClient` (`Sequences/Services/ParallaxClient.Sequences.cs`),
    one per operation, each one call: `OpenSequenceAsync(SequenceOpenRequest)` (manifests as
    `ManifestPart`s through the existing multipart builder, optional expected size) returning
-   `OpenedSequence(SequenceId, Ticket, HeadFrameId)` with the HEAD decoded through Common;
-   `UploadSequenceFramesAsync(SequenceHandle, IReadOnlyList<EncodedFrame>)`;
+   `OpenedSequence(Handle, HeadFrameId)` with the HEAD decoded through Common;
+   `UploadSequenceFramesAsync(SequenceHandle, IReadOnlyList<EncodedFrame>)` (each frame one
+   `application/octet-stream` file part, part name its id, file name `<frameId>.px`);
    `RemoveSequenceFrameAsync`; `GetSequenceGapsAsync`; `GetSequenceProgressAsync`;
    `AmendSequenceExpectedSizeAsync`; `CommitSequenceAsync`; `GetSequenceResultsAsync`;
    `AbandonSequenceAsync`. `SequenceHandle(SequenceId, Ticket)` carries the ticket; the header is
@@ -528,18 +531,22 @@ required options with no client-side default for any server cap.
 4. **The conversation, one call**: `RegisterSequenceAsync(ISequenceFrameSource source,
    SequenceRegisterOptions options, IProgress<SequenceVerdictResponse>? progress, ct)`: open (or
    resume through `options.Existing`), read the source, encode each BODY through Common with its
-   links, upload in batches under `options.Batching` (`MaxRequestBytes`, `MaxFramesPerRequest`,
-   both required), collect errata as what they are, encode END (id = the last BODY id + 1, prev =
-   the last BODY id) and upload it as the sealing batch, read the verdict: not connected or any
-   gap refuses with the verdict (typed `SequenceNotCommittableException` carrying it) and nothing
-   is committed; then commit, repeating while the outcome is `incomplete` up to
-   `options.CommitAttempts` with `options.PollInterval` between attempts, then results. Returns
-   `SequenceRegisterResult(SequenceId, Ticket, Verdict, Commit, Results, Errata)`. Resume:
-   `options.Existing` (sequence id and ticket) reads progress and gaps first; when the state is
-   open the source is read again and only frames whose id lies in a gap or above the reach are
-   uploaded, then END; when sealed, only the gaps' fills; when committed, commit is called again
-   (it resumes) and results read. An account with the feature off, a refused batch or a shortfall
-   surface as the typed problem the server answered.
+   links, upload in batches under `options.Batching` (`MaxRequestBytes`, bounding the whole
+   multipart body each request sends, part headers, boundaries and closing delimiter included,
+   and `MaxFramesPerRequest`, both required; a frame whose request alone exceeds
+   `MaxRequestBytes` is refused, naming it, before it or any batch holding it is sent), encode END
+   (id = the last BODY id + 1, prev = the last BODY id) and upload it as the sealing batch, take
+   the verdict it answers (an END batch answered without one did not seal, and is refused naming
+   the END id): not connected, any gap or any errata refuses with the verdict (typed
+   `SequenceVerdictException` carrying it) and nothing is committed; then commit, repeating while
+   the outcome is `incomplete` up to `options.CommitAttempts` with `options.PollInterval` between
+   attempts, then results. Returns `SequenceRegisterResult(Sequence, Verdict, Commit, Results)`,
+   `Sequence` the `OpenedSequence` the conversation ran in. Resume: `options.Existing` (the
+   `OpenedSequence` a first run answered: handle and HEAD id) reads progress and gaps first; when
+   the state is open the source is read again and only frames whose id lies in a gap or above the
+   reach are uploaded, then END; when sealed, only the gaps' fills; when committed, commit is
+   called again (it resumes) and results read. An account with the feature off, a refused batch
+   or a shortfall surface as the typed problem the server answered.
 5. **Example** `examples/dotnet/SequenceFromImages`: a directory of image files, in name order, as
    the frame source (one image per frame, ids 1..n, the source time offset from a constant frame
    interval the example states), registered through the conversation, then the results and one
@@ -579,4 +586,15 @@ required options with no client-side default for any server cap.
 - **No AI or assistant attribution anywhere in this repository (ruled 2026-09-26):** no co-author
   trailer, no session line, no generated-by remark, in commit messages, code comments, docs or
   examples.
+- **Errata refuse before commit (ruled 2026-09-26):** the server's commit refuses any errata frame
+  (REST `SequenceCommitService`), so the client treats errata in the sealing verdict exactly as it
+  treats gaps and not-connected: `RegisterSequenceAsync` throws `SequenceVerdictException`
+  carrying the verdict (its message names the gap count, the errata count and whether it is
+  connected) and commits nothing; the sequence stays sealed for the caller to abandon or to
+  resolve through take-down. `SequenceRegisterResult` carries no errata; the exception's verdict
+  carries the list.
+- **Refused before the offending frame is sent (ruled 2026-09-26):** the client streams the source
+  with one frame of lookahead, so a non-monotone id or an oversized frame is refused before that
+  frame (or any batch holding it) is sent; batches before it may already have been uploaded,
+  exact retransmits being harmless on a later run.
 

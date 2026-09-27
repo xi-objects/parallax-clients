@@ -74,13 +74,11 @@ internal sealed class SequenceConversationServer
     internal IReadOnlyList<IReadOnlyList<long>> UploadedFrameIds()
         => FramesRequests().Select(parts => (IReadOnlyList<long>)parts.Select(part => long.Parse(part.Name, CultureInfo.InvariantCulture)).ToList()).ToList();
 
+    // PC-104: decodes through the shared Common provider
     /// <summary>Every frames request's frames decoded back through Common, one list per request.</summary>
     internal async Task<IReadOnlyList<IReadOnlyList<DecodedSequenceFrame>>> DecodeUploadsAsync()
     {
-        var services = new ServiceCollection();
-        services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
-        services.AddXioParallaxCommon();
-        using var provider = services.BuildServiceProvider();
+        using var provider = CommonServiceProviderFactory.Build();
         var decoder = provider.GetRequiredService<IXioPxFrameDecoder>();
         var batches = new List<IReadOnlyList<DecodedSequenceFrame>>();
         foreach (var parts in FramesRequests())

@@ -27,8 +27,9 @@ public sealed class SequenceChainLinkerTests
             links.Select(link => (link.Frame.FrameId, link.Prev, link.Next)));
     }
 
+    // PC-102: the lookahead is checked before the frame ahead of it is yielded, so no link is yielded at all
     [Fact]
-    public async Task A_non_monotone_id_is_refused_naming_both_ids()
+    public async Task A_non_monotone_id_is_refused_naming_both_ids_before_any_link_is_yielded()
     {
         var frames = Frames(5, 3);
         var links = new List<(SequenceFrameInput Frame, long Prev, long Next)>();
@@ -43,7 +44,7 @@ public sealed class SequenceChainLinkerTests
 
         Assert.Contains("3", exception.Message);
         Assert.Contains("5", exception.Message);
-        Assert.Single(links);
+        Assert.Empty(links);
     }
 
     [Fact]

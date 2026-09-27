@@ -4,11 +4,11 @@ namespace Xio.Parallax.Client;
 /// <summary>The sequence frame conversation on <see cref="ParallaxClient"/>: upload, and remove one.</summary>
 public sealed partial class ParallaxClient
 {
-    // PC-103: one octet-stream part per frame, under the ticket header, through the raw multipart sender
+    // PC-103: one octet-stream file part per frame, under the ticket header, through the raw multipart sender
     /// <summary>
     /// Uploads one or more sequence frames as a single multipart batch: one
-    /// application/octet-stream part per frame, its part name the frame's own id, in the order
-    /// given. The response's verdict is present only when this batch sealed the sequence; a 409
+    /// application/octet-stream file part per frame, its part name the frame's own id and its file
+    /// name <c>&lt;frameId&gt;.px</c>, in the order given. The response's verdict is present only when this batch sealed the sequence; a 409
     /// means the sequence's own state (already sealed, committed or abandoned) refuses the batch.
     /// </summary>
     /// <param name="handle">The sequence's id and ticket.</param>

@@ -4,6 +4,7 @@ namespace Xio.Parallax.Client;
 /// <summary>Opens a sequence for the calling account, through the raw multipart sender.</summary>
 public sealed partial class ParallaxClient
 {
+    // PC-103: the root path parameters come from RootPathParameters(), the one place they are built
     /// <summary>
     /// Opens a new sequence for the calling account: sends every manifest as a
     /// manifest[&lt;kind&gt;] part and, when given, <see cref="SequenceOpenRequest.ExpectedSize"/>
@@ -16,7 +17,7 @@ public sealed partial class ParallaxClient
     {
         ArgumentNullException.ThrowIfNull(request);
         var content = MultipartRequestContent.CreateForSequenceOpen(request.Manifests, request.ExpectedSize);
-        var pathParameters = new Dictionary<string, object>(StringComparer.Ordinal) { ["baseurl"] = _requestAdapter.BaseUrl! };
+        var pathParameters = RootPathParameters();
         var response = await ExecuteAsync(
             () => MultipartRequestSender.PostAsync(
                 _requestAdapter,

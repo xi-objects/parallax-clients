@@ -46,10 +46,11 @@ public sealed partial class ParallaxClient
             }
         };
 
+    // PC-103: extends RootPathParameters() with the sequence id rather than re-listing baseurl
     private Dictionary<string, object> SequencePathParameters(Guid sequenceId)
-        => new(StringComparer.Ordinal)
-        {
-            ["baseurl"] = _requestAdapter.BaseUrl!,
-            ["sequenceId"] = sequenceId.ToString(),
-        };
+    {
+        var parameters = RootPathParameters();
+        parameters["sequenceId"] = sequenceId.ToString();
+        return parameters;
+    }
 }

@@ -7,7 +7,7 @@ namespace Xio.Parallax.Client;
 /// </summary>
 public sealed partial class ParallaxClient
 {
-    // PC-104: opens or resumes, then carries the sequence through to its results
+    // PC-104: opens or resumes, then carries the sequence through to its results; errata refuse before commit
     /// <summary>
     /// Registers a sequence of frames in one call: opens a sequence (or resumes the one
     /// <see cref="SequenceRegisterOptions.Existing"/> names), reads <paramref name="source"/>,
@@ -22,8 +22,11 @@ public sealed partial class ParallaxClient
     /// <param name="options">Whether to open or resume, the batching caps, and the commit retry policy.</param>
     /// <param name="progress">Reported with every verdict the conversation reads.</param>
     /// <param name="cancellationToken">Cancels the whole conversation.</param>
-    /// <returns>The sequence, the verdict it was sealed on, its commit, its results and its errata frames.</returns>
-    /// <exception cref="SequenceVerdictException">The sealed sequence is not connected or still has gaps; nothing was committed.</exception>
+    /// <returns>The sequence, the verdict it was sealed on, its commit and its results.</returns>
+    /// <exception cref="SequenceVerdictException">
+    /// The sealed sequence is not connected, still has gaps or names errata frames; nothing was committed, and the
+    /// sequence stays sealed for the caller to abandon or to resolve through take-down.
+    /// </exception>
     /// <exception cref="SequenceCommitException">The commit was still incomplete after every allowed attempt.</exception>
     public async Task<SequenceRegisterResult> RegisterSequenceAsync(
         ISequenceFrameSource source,

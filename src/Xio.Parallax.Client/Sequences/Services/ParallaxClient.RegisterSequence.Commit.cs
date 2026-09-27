@@ -5,14 +5,14 @@ namespace Xio.Parallax.Client;
 /// <summary>The verdict check, commit and results phases of <see cref="ParallaxClient.RegisterSequenceAsync"/>.</summary>
 public sealed partial class ParallaxClient
 {
-    // PC-104: refuses a verdict that is not connected or still names a gap, then commits
+    // PC-104: refuses a verdict that is not connected or still names a gap or an errata frame, then commits
     private async Task<SequenceRegisterResult> CommitVerdictAsync(
         OpenedSequence sequence,
         SequenceVerdictResponse verdict,
         SequenceRegisterOptions options,
         CancellationToken cancellationToken)
     {
-        if (verdict.Connected != true || verdict.Gaps is { Count: > 0 })
+        if (verdict.Connected != true || verdict.Gaps is { Count: > 0 } || verdict.Errata is { Count: > 0 })
         {
             throw new SequenceVerdictException(verdict);
         }
@@ -20,7 +20,8 @@ public sealed partial class ParallaxClient
         return await CommitAndReadResultsAsync(sequence, verdict, options, cancellationToken).ConfigureAwait(false);
     }
 
-    // PC-104: commits, calling again after the poll interval while incomplete and attempts remain, then reads results
+    // PC-104: commits, calling again after the poll interval while incomplete and attempts remain, then reads results;
+    // the result carries no errata, since a verdict naming any is refused before commit
     private async Task<SequenceRegisterResult> CommitAndReadResultsAsync(
         OpenedSequence sequence,
         SequenceVerdictResponse verdict,
@@ -40,6 +41,6 @@ public sealed partial class ParallaxClient
         }
 
         var results = await GetSequenceResultsAsync(sequence.Handle, cancellationToken).ConfigureAwait(false);
-        return new SequenceRegisterResult(sequence, verdict, commit, results, verdict.Errata ?? []);
+        return new SequenceRegisterResult(sequence, verdict, commit, results);
     }
 }
