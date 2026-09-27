@@ -1,6 +1,6 @@
 [project]
 name = "xio-parallax-client"
-version = "0.2.0"
+version = "0.2.1"
 description = "Client for the XI Parallax REST API: generated from its OpenAPI document, with the multipart manifests, the slot conversations and the attribution verifier hand-written on top."
 readme = "README.md"
 requires-python = ">=3.11"

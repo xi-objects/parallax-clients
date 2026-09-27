@@ -27,7 +27,8 @@ class CustodyEventResponse:
         Attributes:
             id (UUID):
             account_id (UUID):
-            slot_id (str):
+            subject_id (str):
+            subject_kind (str):
             pool_key (str):
             image_hash (str):
             kind (str):
@@ -39,7 +40,8 @@ class CustodyEventResponse:
 
     id: UUID
     account_id: UUID
-    slot_id: str
+    subject_id: str
+    subject_kind: str
     pool_key: str
     image_hash: str
     kind: str
@@ -58,7 +60,9 @@ class CustodyEventResponse:
 
         account_id = str(self.account_id)
 
-        slot_id = self.slot_id
+        subject_id = self.subject_id
+
+        subject_kind = self.subject_kind
 
         pool_key = self.pool_key
 
@@ -86,7 +90,8 @@ class CustodyEventResponse:
         field_dict.update({
             "id": id,
             "accountId": account_id,
-            "slotId": slot_id,
+            "subjectId": subject_id,
+            "subjectKind": subject_kind,
             "poolKey": pool_key,
             "imageHash": image_hash,
             "kind": kind,
@@ -113,7 +118,9 @@ class CustodyEventResponse:
 
 
 
-        slot_id = d.pop("slotId")
+        subject_id = d.pop("subjectId")
+
+        subject_kind = d.pop("subjectKind")
 
         pool_key = d.pop("poolKey")
 
@@ -163,7 +170,8 @@ class CustodyEventResponse:
         custody_event_response = cls(
             id=id,
             account_id=account_id,
-            slot_id=slot_id,
+            subject_id=subject_id,
+            subject_kind=subject_kind,
             pool_key=pool_key,
             image_hash=image_hash,
             kind=kind,

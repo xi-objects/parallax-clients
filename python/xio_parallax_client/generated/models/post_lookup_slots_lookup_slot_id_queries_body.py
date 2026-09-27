@@ -29,8 +29,8 @@ class PostLookupSlotsLookupSlotIdQueriesBody:
     """ 
         Attributes:
             image (list[File] | Unset): One query image. Its part name carries no meaning. Its content type must be one of
-                SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by
-                SlotUpload:MaxRequestBytes.
+                SlotUpload:AllowedContentTypes; one image is bounded by the calling account's maxImageBytes and the whole
+                request by its maxRequestBytes, both set by the admin.
      """
 
     image: list[File] | Unset = UNSET

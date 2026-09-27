@@ -8,7 +8,6 @@ from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
-from ..types import UNSET, Unset
 from typing import cast
 
 
@@ -16,15 +15,14 @@ from typing import cast
 
 
 
-T = TypeVar("T", bound="CreateAccountRequest")
+T = TypeVar("T", bound="AccountStatsLimitsResponse")
 
 
 
 @_attrs_define
-class CreateAccountRequest:
+class AccountStatsLimitsResponse:
     """ 
         Attributes:
-            name (str):
             registration_grant (int | str):
             lookup_grant (int | str):
             registration_slot_idle_ttl (str):
@@ -33,10 +31,10 @@ class CreateAccountRequest:
             lookup_slot_idle_ttl (str):
             lookup_slot_absolute_ttl (str):
             max_open_lookup_slots (int | str):
-            max_image_bytes (int | str):
-            max_request_bytes (int | str):
             max_query_images_per_lookup_slot (int | str):
             max_query_images_per_lookup_request (int | str):
+            max_image_bytes (int | str):
+            max_request_bytes (int | str):
             max_frames_per_sequence (int | str): Not enforced yet (S17).
             max_open_sequences (int | str): Not enforced yet (S17).
             sequence_idle_ttl (str): Not enforced yet (S17).
@@ -44,10 +42,8 @@ class CreateAccountRequest:
             max_frame_bytes (int | str): Not enforced yet (S17).
             accepted_upload_rate (int | str): Not enforced yet (S17).
             in_flight_allowance (int | str): Not enforced yet (S17).
-            sequences_enabled (bool | Unset):  Default: False.
      """
 
-    name: str
     registration_grant: int | str
     lookup_grant: int | str
     registration_slot_idle_ttl: str
@@ -56,10 +52,10 @@ class CreateAccountRequest:
     lookup_slot_idle_ttl: str
     lookup_slot_absolute_ttl: str
     max_open_lookup_slots: int | str
-    max_image_bytes: int | str
-    max_request_bytes: int | str
     max_query_images_per_lookup_slot: int | str
     max_query_images_per_lookup_request: int | str
+    max_image_bytes: int | str
+    max_request_bytes: int | str
     max_frames_per_sequence: int | str
     max_open_sequences: int | str
     sequence_idle_ttl: str
@@ -67,7 +63,6 @@ class CreateAccountRequest:
     max_frame_bytes: int | str
     accepted_upload_rate: int | str
     in_flight_allowance: int | str
-    sequences_enabled: bool | Unset = False
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
 
@@ -75,8 +70,6 @@ class CreateAccountRequest:
 
 
     def to_dict(self) -> dict[str, Any]:
-        name = self.name
-
         registration_grant: int | str
         registration_grant = self.registration_grant
 
@@ -97,17 +90,17 @@ class CreateAccountRequest:
         max_open_lookup_slots: int | str
         max_open_lookup_slots = self.max_open_lookup_slots
 
-        max_image_bytes: int | str
-        max_image_bytes = self.max_image_bytes
-
-        max_request_bytes: int | str
-        max_request_bytes = self.max_request_bytes
-
         max_query_images_per_lookup_slot: int | str
         max_query_images_per_lookup_slot = self.max_query_images_per_lookup_slot
 
         max_query_images_per_lookup_request: int | str
         max_query_images_per_lookup_request = self.max_query_images_per_lookup_request
+
+        max_image_bytes: int | str
+        max_image_bytes = self.max_image_bytes
+
+        max_request_bytes: int | str
+        max_request_bytes = self.max_request_bytes
 
         max_frames_per_sequence: int | str
         max_frames_per_sequence = self.max_frames_per_sequence
@@ -128,13 +121,10 @@ class CreateAccountRequest:
         in_flight_allowance: int | str
         in_flight_allowance = self.in_flight_allowance
 
-        sequences_enabled = self.sequences_enabled
-
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({
-            "name": name,
             "registrationGrant": registration_grant,
             "lookupGrant": lookup_grant,
             "registrationSlotIdleTtl": registration_slot_idle_ttl,
@@ -143,10 +133,10 @@ class CreateAccountRequest:
             "lookupSlotIdleTtl": lookup_slot_idle_ttl,
             "lookupSlotAbsoluteTtl": lookup_slot_absolute_ttl,
             "maxOpenLookupSlots": max_open_lookup_slots,
-            "maxImageBytes": max_image_bytes,
-            "maxRequestBytes": max_request_bytes,
             "maxQueryImagesPerLookupSlot": max_query_images_per_lookup_slot,
             "maxQueryImagesPerLookupRequest": max_query_images_per_lookup_request,
+            "maxImageBytes": max_image_bytes,
+            "maxRequestBytes": max_request_bytes,
             "maxFramesPerSequence": max_frames_per_sequence,
             "maxOpenSequences": max_open_sequences,
             "sequenceIdleTtl": sequence_idle_ttl,
@@ -155,8 +145,6 @@ class CreateAccountRequest:
             "acceptedUploadRate": accepted_upload_rate,
             "inFlightAllowance": in_flight_allowance,
         })
-        if sequences_enabled is not UNSET:
-            field_dict["sequencesEnabled"] = sequences_enabled
 
         return field_dict
 
@@ -165,8 +153,6 @@ class CreateAccountRequest:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        name = d.pop("name")
-
         def _parse_registration_grant(data: object) -> int | str:
             return cast(int | str, data)
 
@@ -199,18 +185,6 @@ class CreateAccountRequest:
         max_open_lookup_slots = _parse_max_open_lookup_slots(d.pop("maxOpenLookupSlots"))
 
 
-        def _parse_max_image_bytes(data: object) -> int | str:
-            return cast(int | str, data)
-
-        max_image_bytes = _parse_max_image_bytes(d.pop("maxImageBytes"))
-
-
-        def _parse_max_request_bytes(data: object) -> int | str:
-            return cast(int | str, data)
-
-        max_request_bytes = _parse_max_request_bytes(d.pop("maxRequestBytes"))
-
-
         def _parse_max_query_images_per_lookup_slot(data: object) -> int | str:
             return cast(int | str, data)
 
@@ -221,6 +195,18 @@ class CreateAccountRequest:
             return cast(int | str, data)
 
         max_query_images_per_lookup_request = _parse_max_query_images_per_lookup_request(d.pop("maxQueryImagesPerLookupRequest"))
+
+
+        def _parse_max_image_bytes(data: object) -> int | str:
+            return cast(int | str, data)
+
+        max_image_bytes = _parse_max_image_bytes(d.pop("maxImageBytes"))
+
+
+        def _parse_max_request_bytes(data: object) -> int | str:
+            return cast(int | str, data)
+
+        max_request_bytes = _parse_max_request_bytes(d.pop("maxRequestBytes"))
 
 
         def _parse_max_frames_per_sequence(data: object) -> int | str:
@@ -257,10 +243,7 @@ class CreateAccountRequest:
         in_flight_allowance = _parse_in_flight_allowance(d.pop("inFlightAllowance"))
 
 
-        sequences_enabled = d.pop("sequencesEnabled", UNSET)
-
-        create_account_request = cls(
-            name=name,
+        account_stats_limits_response = cls(
             registration_grant=registration_grant,
             lookup_grant=lookup_grant,
             registration_slot_idle_ttl=registration_slot_idle_ttl,
@@ -269,10 +252,10 @@ class CreateAccountRequest:
             lookup_slot_idle_ttl=lookup_slot_idle_ttl,
             lookup_slot_absolute_ttl=lookup_slot_absolute_ttl,
             max_open_lookup_slots=max_open_lookup_slots,
-            max_image_bytes=max_image_bytes,
-            max_request_bytes=max_request_bytes,
             max_query_images_per_lookup_slot=max_query_images_per_lookup_slot,
             max_query_images_per_lookup_request=max_query_images_per_lookup_request,
+            max_image_bytes=max_image_bytes,
+            max_request_bytes=max_request_bytes,
             max_frames_per_sequence=max_frames_per_sequence,
             max_open_sequences=max_open_sequences,
             sequence_idle_ttl=sequence_idle_ttl,
@@ -280,12 +263,11 @@ class CreateAccountRequest:
             max_frame_bytes=max_frame_bytes,
             accepted_upload_rate=accepted_upload_rate,
             in_flight_allowance=in_flight_allowance,
-            sequences_enabled=sequences_enabled,
         )
 
 
-        create_account_request.additional_properties = d
-        return create_account_request
+        account_stats_limits_response.additional_properties = d
+        return account_stats_limits_response
 
     @property
     def additional_keys(self) -> list[str]:
