@@ -47,15 +47,24 @@ from .wire import TICKET_HEADER
 #: The largest expected size the server accepts: an int32.
 _MAX_EXPECTED_SIZE = 2**31 - 1
 
+# PC-113: rework - the two hand-written routes' paths, declared once for both sync and async
+OPEN_SEQUENCE_PATH = "/sequences"
+
+
+def _sequence_frames_path(sequence_id: object) -> str:
+    """The frames-upload path for a given sequence id, shared by both route mixins."""
+    return f"/sequences/{sequence_id}/frames"
+
 
 def _ticket_headers(handle: SequenceHandle) -> dict[str, str]:
     """The one place a ticket becomes an `httpx` header, for the two hand-written posts."""
     return {TICKET_HEADER: handle.ticket}
 
 
+# PC-113: rework - built from _ticket_headers' value so exactly one line reads handle.ticket
 def _ticket_kwargs(handle: SequenceHandle) -> dict[str, str]:
     """The same ticket, shaped as the keyword a generated sequence request function takes."""
-    return {"x_sequence_ticket": handle.ticket}
+    return {"x_sequence_ticket": _ticket_headers(handle)[TICKET_HEADER]}
 
 
 def _open_sequence_parts(request: SequenceOpenRequest) -> list[MultipartPart]:
@@ -105,7 +114,7 @@ class SequenceRoutes:
         A 403 with slug `sequences-not-enabled` raises `problems.SequencesNotEnabled`.
         """
         parts = _open_sequence_parts(request)
-        response = self._http().post("/sequences", files=parts)
+        response = self._http().post(OPEN_SEQUENCE_PATH, files=parts)
         problems.raise_for_problem(response)
         opened = SequenceOpenResponse.from_dict(response.json())
         head_frame = base64.b64decode(opened.head_frame)
@@ -120,7 +129,7 @@ class SequenceRoutes:
         _refuse_empty_frames(frames)
         parts = build_sequence_frame_parts(frames)
         response = self._http().post(
-            f"/sequences/{handle.sequence_id}/frames", files=parts, headers=_ticket_headers(handle)
+            _sequence_frames_path(handle.sequence_id), files=parts, headers=_ticket_headers(handle)
         )
         problems.raise_for_problem(response)
         return SequenceFrameBatchResponse.from_dict(response.json())

@@ -18,9 +18,8 @@ import httpx
 import pytest
 import respx
 from xio_parallax_client import AsyncParallaxClient, ParallaxClient, ParallaxClientOptions
-from xio_parallax_client.frames.binding import default_frame_codec, resolve_frame_codec
+from xio_parallax_client.frames.binding import DefaultPxFrameCodec, default_frame_codec, resolve_frame_codec
 from xio_parallax_client.frames.protocol import EncodedPxFrame, PxFrame, PxFrameAccepted, PxHeadHeader
-from xio_parallax_client.frames.pure import PurePxFrameCodec
 
 from .conftest import BASE_URL
 from .sequence_server import multipart_parts
@@ -106,16 +105,19 @@ def test_sequences_never_import_a_binding() -> None:
     assert offenders & sequences_files == set()
 
 
+# PC-113: rework - assert against the binding's own default type, not the pure codec directly,
+# so swapping frames/binding.py's import line changes no test
 def test_default_codec_is_the_binding_line() -> None:
     """`resolve_frame_codec(None)` and `default_frame_codec()` both answer the binding's default."""
-    assert isinstance(resolve_frame_codec(None), PurePxFrameCodec)
-    assert isinstance(default_frame_codec(), PurePxFrameCodec)
+    assert isinstance(resolve_frame_codec(None), DefaultPxFrameCodec)
+    assert isinstance(default_frame_codec(), DefaultPxFrameCodec)
 
 
+# PC-113: rework - assert against the binding's own default type, not the pure codec directly
 def test_client_frame_codec_defaults_to_the_binding(options: ParallaxClientOptions) -> None:
     """Both clients resolve `frame_codec=None` to the default binding, held as `client.frame_codec`."""
-    assert isinstance(ParallaxClient(options).frame_codec, PurePxFrameCodec)
-    assert isinstance(AsyncParallaxClient(options).frame_codec, PurePxFrameCodec)
+    assert isinstance(ParallaxClient(options).frame_codec, DefaultPxFrameCodec)
+    assert isinstance(AsyncParallaxClient(options).frame_codec, DefaultPxFrameCodec)
 
 
 def test_a_non_codec_is_refused_naming_every_missing_member() -> None:

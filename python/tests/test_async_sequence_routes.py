@@ -5,6 +5,8 @@ shapes, the typed 403, the empty-upload and out-of-range refusals, and a 409 on 
 repeating every route the sync suite already proves member for member.
 """
 
+# PC-113: rework - story key at the change site; async sequence route parity tests
+
 from __future__ import annotations
 
 import base64
@@ -185,3 +187,18 @@ async def test_abandon_sequence_sends_delete_sequence_under_the_ticket_header_an
 
     assert response.state == "abandoned"
     assert route.calls.last.request.headers[TICKET_HEADER] == "sequence-ticket-abandon"
+
+
+# PC-113: rework - no test exercised AsyncParallaxClient.remove_sequence_frame; mirrors the sync test
+@respx.mock
+async def test_remove_sequence_frame_deletes_the_given_frame_under_the_ticket_header(
+    options: ParallaxClientOptions,
+) -> None:
+    handle = SequenceHandle(uuid4(), "sequence-ticket-remove")
+    route = respx.delete(f"{BASE_URL}/sequences/{handle.sequence_id}/frames/7").mock(
+        return_value=httpx.Response(204)
+    )
+    client = AsyncParallaxClient(options)
+
+    assert await client.remove_sequence_frame(handle, 7) is None
+    assert route.calls.last.request.headers[TICKET_HEADER] == "sequence-ticket-remove"

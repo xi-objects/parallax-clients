@@ -40,9 +40,11 @@ from ..multipart import build_sequence_frame_parts
 from .encoding import SequenceFrameEncoder
 from .models import EncodedFrame, OpenedSequence, SequenceHandle, SequenceOpenRequest
 from .routes import (
+    OPEN_SEQUENCE_PATH,
     _open_sequence_parts,
     _refuse_empty_frames,
     _refuse_non_positive_expected_size,
+    _sequence_frames_path,
     _ticket_headers,
     _ticket_kwargs,
 )
@@ -65,7 +67,7 @@ class AsyncSequenceRoutes:
     async def open_sequence(self: _AsyncSequenceRoutesHost, request: SequenceOpenRequest) -> OpenedSequence:
         """Async mirror of `SequenceRoutes.open_sequence`."""
         parts = _open_sequence_parts(request)
-        response = await self._http().post("/sequences", files=parts)
+        response = await self._http().post(OPEN_SEQUENCE_PATH, files=parts)
         problems.raise_for_problem(response)
         opened = SequenceOpenResponse.from_dict(response.json())
         head_frame = base64.b64decode(opened.head_frame)
@@ -80,7 +82,7 @@ class AsyncSequenceRoutes:
         _refuse_empty_frames(frames)
         parts = build_sequence_frame_parts(frames)
         response = await self._http().post(
-            f"/sequences/{handle.sequence_id}/frames", files=parts, headers=_ticket_headers(handle)
+            _sequence_frames_path(handle.sequence_id), files=parts, headers=_ticket_headers(handle)
         )
         problems.raise_for_problem(response)
         return SequenceFrameBatchResponse.from_dict(response.json())

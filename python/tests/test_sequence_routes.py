@@ -5,6 +5,8 @@ The remaining seven route members (the generated request builders) are in
 `test_sequence_routes_progress.py`, split out to keep this file under the project's 300-line cap.
 """
 
+# PC-113: rework - story key at the change site; open, upload and remove-frame route tests
+
 from __future__ import annotations
 
 import base64
