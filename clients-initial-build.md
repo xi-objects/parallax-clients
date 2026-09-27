@@ -598,3 +598,88 @@ required options with no client-side default for any server cap.
   frame (or any batch holding it) is sent; batches before it may already have been uploaded,
   exact retransmits being harmless on a later run.
 
+## sequences in python (2026-09-27)
+
+The Python client catches up with .NET's sequence conversation above: the same nine routes, the
+same one-call `register_sequence`, built as `python-sequences-design.md` worked it out in full;
+this section distils that note to what stays true once the code lands. It supersedes the
+2026-09-26 rulings ".NET only, for now" and "no parity required during active development" below;
+those two rulings are left as written, for the record of what was decided when.
+
+### the surveyed facts
+
+- The pinned document's `/sequences/{sequenceId}/...` operations never declare `sequenceId`
+  `in: path` (the server's ticket filter reads it from route values instead), which makes
+  openapi-python-client refuse those operations with "Incorrect path templating" and skip them —
+  8 of the 9 sequence operations, confirmed by a scratch generation run. Kiota tolerates the same
+  document because it builds a request builder from the path template alone.
+- Xio.Parallax.Common (nuget.org, .NET) has no Python counterpart; the pure-Python reimplementation
+  here is proven against `xio_parallax_common`'s own test vectors, vendored at a pinned commit, not
+  against the package itself.
+- `blake3` is already a dependency (the attribution verifier uses it), so the codec needs none new.
+
+### the seam
+
+`xio_parallax_client.frames.PxFrameCodec`, a `typing.Protocol`: `format_version`, `encode`,
+`decode`, `build_chain`, `compute_sequence_hash`, mirroring the five services
+`AddXioParallaxCommon()` registers in .NET, folded into one object. Both clients take a
+keyword-only `frame_codec` on their constructor; `None` resolves through
+`frames.binding.resolve_frame_codec` to the package's own pure-Python binding
+(`frames/pure/PurePxFrameCodec`), and a codec missing part of the protocol is refused, naming every
+missing member. `frames/binding.py` holds the default as its one import line, so a future codec
+library or native shim replaces it package-wide by changing that line, or per client through
+`frame_codec=`; nothing in `sequences/`, either client, the example or the tests depends on which
+binding runs, and the conformance suite runs over every binding it is given.
+
+### the rulings
+
+- **Python gets Sequences (ruled 2026-09-27):** superseding "the Python client is untouched" and
+  "no parity required" above; the two clients converge on the sequence conversation.
+- **The codec sits behind a protocol (ruled 2026-09-27):** the .NET client composes
+  Xio.Parallax.Common directly with no seam of its own; the Python client, having no such package
+  to compose, puts one protocol between the conversation and its pure-Python binding so a future
+  library or native shim is a one-line change, never a rewrite of the conversation.
+- **Admission streams; validation lists everything (ruled 2026-09-27):** frame admission mirrors
+  .NET's stream-with-lookahead ruling above (the first offending frame refuses, naming it, before
+  it or any batch holding it is sent); option and frame-input validation, being pure checks over
+  values already in hand, list every bad field together in one refusal instead.
+- **The 403 is typed in Python only (ruled 2026-09-27):** `sequences-not-enabled` builds
+  `problems.SequencesNotEnabled(ParallaxProblem)`, matched by slug (a refused ticket is also 403,
+  under a different slug); `except ParallaxProblem` still catches it. .NET keeps its plain
+  `ParallaxProblemException` unchanged.
+- **Vectors vendored, not reimplemented from a private clone (ruled 2026-09-27):** the format's
+  disclosure to this repository is accepted; `xio_parallax_common`'s test vectors are copied
+  unmodified into `python/tests/vectors/px-frame/` at a pinned commit, recorded in that
+  directory's `VECTORS.md`, and are XI Objects' own test material redistributed as-is, not under
+  this repository's MIT license; the conformance suite runs over every binding.
+- **The generator gap is closed in the reshape script, not upstream (ruled 2026-09-27):**
+  `scripts/openapi-for-python.py` declares, for every operation, each path-template name it does
+  not already declare `in: path` as a required string parameter derived from the template itself —
+  a no-op the day the server declares it directly; generated code stays untouched, and the proper
+  fix (binding `sequenceId` in each handler) belongs in `xio_parallax_rest`, outside this work.
+
+### the stories
+
+Keys continue PR #2's PC-101..106. `python-sequences-design.md` carries each story's owned files
+and acceptance criteria in full.
+
+- **PC-107** the pure PX Frame codec (`frames/pure/`) and the binding line (`frames/binding.py`).
+- **PC-108** the pure chain builder and sequence hash (`frames/pure/_chain*.py`).
+- **PC-109** the vendored vectors and the conformance suite over every binding.
+- **PC-110** the generator reshape declaring undeclared path parameters; all nine sequence
+  operations generate.
+- **PC-111** the sequence models, the frame-input validation, the wire words, the typed 403.
+- **PC-112** the chain linker, batch planning, frame encoding, and sequence multipart parts.
+- **PC-113** the nine route members, sync and async, and the `frame_codec` keyword on both
+  clients.
+- **PC-114** the one-call `register_sequence` conversation, sync and async, with resume.
+- **PC-115** the Python `sequence_from_images.py` example, mirroring .NET's.
+- **PC-116** this section, the README, and the version.
+
+### what stays open
+
+The licence question this note raised for the vendored vectors and for a clean-room
+reimplementation from the format's own documentation is for the owner to confirm; until then,
+`VECTORS.md` states the vectors' status as XI Objects' own material redistributed unmodified, and
+this repository's MIT license does not extend to them.
+
