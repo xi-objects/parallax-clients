@@ -52,6 +52,21 @@ class ParallaxProblem(Exception):
         self.retry_after = retry_after
 
 
+# PC-111: the typed 403 a sequence route answers when the account has no Sequences access
+class SequencesNotEnabled(ParallaxProblem):
+    """The 403 the server answers on any `/sequences` route when the account lacks Sequences access.
+
+    Matched by the problem slug `sequences-not-enabled`, not by status alone: a refused ticket is
+    also a 403 (`sequence-ticket-refused`) and stays a plain `ParallaxProblem`.
+    """
+
+
+# PC-111: slug to typed-subclass mapping, the one place a problem slug gets its own exception type
+_TYPED_PROBLEMS: dict[str, type[ParallaxProblem]] = {
+    "sequences-not-enabled": SequencesNotEnabled,
+}
+
+
 @runtime_checkable
 class _ProblemResponse(Protocol):
     """The minimal response shape `problems.py` needs: both httpx's own `Response` and the
@@ -100,10 +115,13 @@ def problem_from_response(response: _ProblemResponse) -> ParallaxProblem:
         if isinstance(parsed, dict):
             body = parsed
     type_ = body.get("type")
-    return ParallaxProblem(
+    slug = _slug_from_type(type_)
+    # PC-111: the slug, not the status, picks the typed subclass; a plain ParallaxProblem otherwise
+    problem_type = _TYPED_PROBLEMS.get(slug, ParallaxProblem)
+    return problem_type(
         status=status,
         type=type_,
-        slug=_slug_from_type(type_),
+        slug=slug,
         title=body.get("title"),
         detail=body.get("detail"),
         trace_id=body.get("traceId"),
