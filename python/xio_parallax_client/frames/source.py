@@ -18,6 +18,20 @@ from typing import Protocol, runtime_checkable
 
 from .protocol import IMAGE_BUCKET_TAG, PxBucketContent
 
+# PC-111: rework - the format's bucket-tag shape, checked here (input validation) as well as by the
+# encoder; kept local to source.py rather than imported from frames.pure, which only binding.py may
+# import (see test_only_binding_imports_the_pure_codec)
+_BUCKET_TAG_LENGTH = 4
+_MIN_BUCKET_TAG_BYTE = 0x21
+_MAX_BUCKET_TAG_BYTE = 0x7E
+
+
+def _is_valid_bucket_tag(tag: str) -> bool:
+    """A bucket tag is exactly four characters, each in 0x21-0x7E."""
+    return len(tag) == _BUCKET_TAG_LENGTH and all(
+        _MIN_BUCKET_TAG_BYTE <= ord(character) <= _MAX_BUCKET_TAG_BYTE for character in tag
+    )
+
 
 @dataclass(frozen=True, slots=True)
 class SequenceFrameInput:
@@ -33,9 +47,11 @@ class SequenceFrameInput:
     source_time_offset: timedelta
     buckets: tuple[PxBucketContent, ...]
 
-    # PC-111: lists every offence at once, mirroring .NET's SequenceFrameInput validation
+    # PC-111: rework - also refuses a malformed tag or empty data, naming every offending bucket,
+    # so a bad frame is caught before any send rather than by the encoder mid-stream (PC-112)
     def __post_init__(self) -> None:
-        """Refuse a non-positive id, a negative offset, no bucket, or a repeated tag; name every one."""
+        """Refuse a non-positive id, a negative offset, no bucket, a repeated or malformed tag, or
+        empty bucket data; name every one together."""
         errors: list[str] = []
         if self.frame_id <= 0:
             errors.append(f"frame_id must be above zero; was {self.frame_id}")
@@ -47,9 +63,13 @@ class SequenceFrameInput:
             seen: set[str] = set()
             duplicates: set[str] = set()
             for bucket in self.buckets:
-                if bucket.tag in seen:
+                if not _is_valid_bucket_tag(bucket.tag):
+                    errors.append(f"bucket tag {bucket.tag!r} must be exactly 4 bytes in 0x21-0x7E")
+                elif bucket.tag in seen:
                     duplicates.add(bucket.tag)
                 seen.add(bucket.tag)
+                if not bucket.data:
+                    errors.append(f"bucket {bucket.tag!r} has no data")
             for tag in sorted(duplicates):
                 errors.append(f"a frame's buckets repeat tag {tag!r}")
         if errors:
