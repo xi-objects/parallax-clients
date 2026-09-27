@@ -78,6 +78,57 @@ report = AttributionVerifier(TrustRoots.from_orbital(orbital_url)).verify(record
 
 `AsyncParallaxClient` mirrors every call for asyncio. Refusals raise `ParallaxProblem`.
 
+## Sequences
+
+A sequence is a video registered frame by frame rather than as one upload: the API assembles
+BODY frames into a chain, seals it with an END frame, and commits it to one sequence hash the
+same way a batch commits to a slot. This is a .NET-only conversation for now; the Python client
+is untouched.
+
+`ISequenceFrameSource` is the interface a later ingestion (something that decodes a video into
+frames) implements: `IAsyncEnumerable<SequenceFrameInput> ReadFramesAsync(CancellationToken)`,
+yielding frames in chain order. The source owns each frame's id (monotone, room between them is
+allowed) and its position within its own media (`SourceTimeOffset`); it says nothing about the
+links between frames — the client derives every frame's `prev` from the frame read immediately
+before it (the sequence's HEAD id for the first) and its `next` from the frame read immediately
+after it, buffering one frame of lookahead. `SequenceFrameInput.ForImage(frameId, offset,
+imageBytes)` builds a frame carrying a single image bucket.
+
+`RegisterSequenceAsync(source, options, progress)` is the whole conversation in one call: open a
+sequence (or resume the one named by `options.Existing`), read `source`, encode and upload its
+frames in batches under `options.Batching` (`MaxRequestBytes`, `MaxFramesPerRequest` — both
+required, with no client-side default for either server cap), seal the sequence with an END
+frame, commit it (retrying an incomplete commit up to `options.CommitAttempts`, waiting
+`options.PollInterval` between attempts) and read its results. `progress`, when given, is
+reported with every verdict the conversation reads along the way.
+
+```csharp
+var opened = await client.OpenSequenceAsync(new SequenceOpenRequest(manifests, expectedSize: frameCount));
+var options = new SequenceRegisterOptions(TimeSpan.FromSeconds(1), commitAttempts: 5, batching)
+{
+    Open = new SequenceOpenRequest(manifests, expectedSize: frameCount),
+};
+var result = await client.RegisterSequenceAsync(source, options, progress);
+Console.WriteLine($"{result.Results.SequenceHash}: {result.Results.Outcome}");
+```
+
+Resume after an interruption by calling `RegisterSequenceAsync` again with
+`options.Existing` set to the `OpenedSequence` a first run answered (or that `OpenSequenceAsync`
+answered directly), rather than `options.Open`: an open sequence gets only the frames inside a
+gap or above its reach, then the END frame; a sealed one gets only its gap fills; a committed one
+just has commit called again (the server resumes from the first unpublished frame) and its
+results read.
+
+An account needs its `sequences_enabled` flag set; without it, opening a sequence is refused with
+the typed problem the server answers, the same as any other refusal.
+
+`examples/dotnet/SequenceFromImages` is the stand-in for the ingestion that decodes a video into
+frames: it reads a directory of image files, in ordinal name order, as one sequence's frames
+(frame ids 1..n, each frame's source time offset the constant frame interval it is given),
+registers them through `RegisterSequenceAsync`, prints every verdict, the sequence hash, the
+outcome, the final size and any errata frames, then looks its first image up through `LookupAsync`
+to prove the round trip.
+
 ## The verifier
 
 `verify` returns a report with one outcome per check, never a bare boolean: `originalImageHash`
@@ -167,6 +218,7 @@ compare the found file with the recovered record. Each reads its inputs from env
 variables named in its header, including `PARALLAX_INCLUDE_EMBEDDED`; `.env.example` names them
 all, and a git-ignored `.env` holds your values. All of them have been run against the API's own
 e2e stack and against production, with the roots pinned from the live Orbital's `/info`.
+`examples/dotnet/SequenceFromImages` is described above, under Sequences.
 
 ## Building
 
