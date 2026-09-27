@@ -1,0 +1,244 @@
+"""The one-call sequence conversation: open or resume, upload, seal, commit, results.
+
+Mirrors `Xio.Parallax.Client.Sequences.Services.ParallaxClient.RegisterSequence*`: the I/O shell
+only. Every decision (batching, resume selection, committability) is a pure function in
+`planning.py`; every link derivation is `linker.link_frames`; every byte on the wire comes from the
+codec through `encoding.SequenceFrameEncoder`.
+"""
+
+# PC-114: the sequence conversation's one-call register, sync
+
+from __future__ import annotations
+
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+from ..frames.protocol import PxGapRange
+from ..frames.source import SequenceFrameSource
+from ..problems import ParallaxClientError
+from .encoding import SequenceFrameEncoder
+from .errors import SequenceCommitError, SequenceVerdictError
+from .linker import link_frames
+from .models import (
+    OpenedSequence,
+    SequenceBatching,
+    SequenceRegisterOptions,
+    SequenceRegisterResult,
+    VerdictCallback,
+)
+from .planning import FrameBatchPlanner, is_committable, is_selected_for_resume
+from .routes import SequenceRoutes
+from .wire import OUTCOME_INCOMPLETE, STATE_COMMITTED, STATE_OPEN, STATE_SEALED
+
+if TYPE_CHECKING:
+    from ..generated.models.sequence_commit_response import SequenceCommitResponse
+    from ..generated.models.sequence_gaps_response import SequenceGapsResponse
+    from ..generated.models.sequence_verdict_response import SequenceVerdictResponse
+
+#: A frame id predicate: `True` when a frame the linker yields is one this seal actually uploads.
+_Selects = Callable[[int], bool]
+
+
+# PC-114: the last BODY id and the END id the linker derived after reading the whole source
+@dataclass(frozen=True, slots=True)
+class _SourceTail:
+    """The chain's last BODY id and the END id the linker derived after it, for a fresh seal."""
+
+    last_body_id: int
+    end_frame_id: int
+
+
+def _select_every_frame(frame_id: int) -> bool:
+    """A fresh open selects every frame the linker yields; only a resume filters."""
+    return True
+
+
+def _refuse_unless_exactly_one_of_open_and_existing(options: SequenceRegisterOptions) -> None:
+    """Raise `ValueError` naming `open` and `existing` unless exactly one of them is set."""
+    if (options.open is None) == (options.existing is None):
+        raise ValueError("exactly one of open and existing must be set")
+
+
+def _gap_ranges(response: SequenceGapsResponse) -> tuple[PxGapRange, ...]:
+    """The gaps a `SequenceGapsResponse` carries, as `PxGapRange`s with 64-bit fields as `int`."""
+    return tuple(PxGapRange(int(gap.from_), int(gap.to)) for gap in response.gaps)
+
+
+class SequenceConversation(SequenceRoutes):
+    """Mixin adding `register_sequence` to `ParallaxClient`, over the nine route members it inherits."""
+
+    # PC-114: opens or resumes, then carries the sequence through to its results
+    def register_sequence(
+        self,
+        source: SequenceFrameSource,
+        options: SequenceRegisterOptions,
+        on_verdict: VerdictCallback | None = None,
+    ) -> SequenceRegisterResult:
+        """Register a sequence of frames in one call; see `python-sequences-design.md` section (d).
+
+        Opens a sequence (or resumes the one `options.existing` names), reads `source`, encodes
+        each frame as a BODY with its derived links, uploads them in batches under
+        `options.batching`, seals the sequence with END, commits it (retrying an incomplete
+        commit) and reads its results. Running the call again over the same source with
+        `options.existing` resumes after an interruption: an open sequence gets only the frames
+        inside a gap or above its reach then END; a sealed one only its gap fills; a committed one
+        only its commit again.
+        """
+        _refuse_unless_exactly_one_of_open_and_existing(options)
+
+        if options.open is not None:
+            opened = self.open_sequence(options.open)
+            verdict = self._seal_sequence(opened, source, options.batching, _select_every_frame, on_verdict)
+            return self._commit_verdict(opened, verdict, options)
+
+        return self._resume_sequence(options.existing, source, options, on_verdict)
+
+    # PC-114: branches a resume on the sequence's own state, as its progress answers it
+    def _resume_sequence(
+        self,
+        existing: OpenedSequence,
+        source: SequenceFrameSource,
+        options: SequenceRegisterOptions,
+        on_verdict: VerdictCallback | None,
+    ) -> SequenceRegisterResult:
+        """Resume `existing`: an open sequence gets its missing frames then END, a sealed one only
+        its gap fills, a committed one only its commit again; any other state refuses, naming it."""
+        current = self.get_sequence_progress(existing.handle)
+        if on_verdict is not None:
+            on_verdict(current)
+
+        if current.state == STATE_OPEN:
+            return self._resume_open_sequence(existing, current, source, options, on_verdict)
+
+        if current.state == STATE_SEALED:
+            return self._resume_sealed_sequence(existing, source, options, on_verdict)
+
+        if current.state == STATE_COMMITTED:
+            return self._commit_and_read_results(existing, current, options)
+
+        raise ParallaxClientError(f"a sequence in state {current.state!r} cannot be resumed")
+
+    # PC-114: an open sequence gets only the frames above its reach or inside a gap, then END
+    def _resume_open_sequence(
+        self,
+        existing: OpenedSequence,
+        current: SequenceVerdictResponse,
+        source: SequenceFrameSource,
+        options: SequenceRegisterOptions,
+        on_verdict: VerdictCallback | None,
+    ) -> SequenceRegisterResult:
+        """Resume an `open` sequence: reach and gaps select which frames re-send, then END."""
+        if current.reach is None:
+            raise ParallaxClientError("the Parallax API answered an open sequence's progress without its reach")
+        reach = int(current.reach)
+        gaps = _gap_ranges(self.get_sequence_gaps(existing.handle))
+
+        def selects(frame_id: int) -> bool:
+            return is_selected_for_resume(frame_id, reach, gaps)
+
+        verdict = self._seal_sequence(existing, source, options.batching, selects, on_verdict)
+        return self._commit_verdict(existing, verdict, options)
+
+    # PC-114: a sealed sequence gets only its gap fills, and no END
+    def _resume_sealed_sequence(
+        self,
+        existing: OpenedSequence,
+        source: SequenceFrameSource,
+        options: SequenceRegisterOptions,
+        on_verdict: VerdictCallback | None,
+    ) -> SequenceRegisterResult:
+        """Resume a `sealed` sequence: only the gap fills are sent, and its progress is re-read."""
+        gaps = _gap_ranges(self.get_sequence_gaps(existing.handle))
+
+        def selects(frame_id: int) -> bool:
+            return any(gap.range_from <= frame_id <= gap.range_to for gap in gaps)
+
+        self._upload_source_frames(existing, source, options.batching, selects)
+        verdict = self.get_sequence_progress(existing.handle)
+        if on_verdict is not None:
+            on_verdict(verdict)
+        return self._commit_verdict(existing, verdict, options)
+
+    # PC-114: uploads the selected frames, then END as its own batch, and takes the verdict it answered
+    def _seal_sequence(
+        self,
+        sequence: OpenedSequence,
+        source: SequenceFrameSource,
+        batching: SequenceBatching,
+        selects: _Selects,
+        on_verdict: VerdictCallback | None,
+    ) -> SequenceVerdictResponse:
+        """Upload every frame `selects` keeps, seal with END, and return the verdict it answered."""
+        tail = self._upload_source_frames(sequence, source, batching, selects)
+        if tail is None:
+            raise ParallaxClientError(
+                "a sequence needs at least one BODY; the source yielded no frame, and the sequence is left open"
+            )
+
+        encoder = SequenceFrameEncoder(self.frame_codec)
+        end = encoder.encode_end(sequence.handle.sequence_id, tail.end_frame_id, tail.last_body_id)
+        sealing = self.upload_sequence_frames(sequence.handle, [end])
+        if sealing.verdict is None:
+            raise ParallaxClientError(
+                f"the Parallax API admitted END frame {end.frame_id} without a verdict; the sequence did not seal"
+            )
+        if on_verdict is not None:
+            on_verdict(sealing.verdict)
+        return sealing.verdict
+
+    # PC-114: streams the source through the linker, encodes and uploads the selected frames one batch at a time
+    def _upload_source_frames(
+        self,
+        sequence: OpenedSequence,
+        source: SequenceFrameSource,
+        batching: SequenceBatching,
+        selects: _Selects,
+    ) -> _SourceTail | None:
+        """Read the whole source, linked from the sequence's HEAD id; upload every frame `selects`
+        keeps, batched under `batching`; return the last frame's id and its derived END id, or
+        `None` when the source yielded no frame at all."""
+        encoder = SequenceFrameEncoder(self.frame_codec)
+        planner = FrameBatchPlanner(batching.max_request_bytes, batching.max_frames_per_request)
+        tail: _SourceTail | None = None
+        for linked in link_frames(source.read_frames(), sequence.head_frame_id):
+            tail = _SourceTail(linked.frame.frame_id, linked.next)
+            if not selects(linked.frame.frame_id):
+                continue
+            encoded = encoder.encode_body(sequence.handle.sequence_id, linked.frame, linked.prev, linked.next)
+            batch = planner.add(encoded)
+            if batch is not None:
+                self.upload_sequence_frames(sequence.handle, batch)
+
+        remaining = planner.flush()
+        if remaining is not None:
+            self.upload_sequence_frames(sequence.handle, remaining)
+        return tail
+
+    # PC-114: refuses a verdict that is not connected or still names a gap or an errata frame, then commits
+    def _commit_verdict(
+        self, sequence: OpenedSequence, verdict: SequenceVerdictResponse, options: SequenceRegisterOptions
+    ) -> SequenceRegisterResult:
+        """Raise `SequenceVerdictError` unless `verdict` is committable; otherwise commit and read results."""
+        if not is_committable(verdict.connected, len(verdict.gaps), len(verdict.errata)):
+            raise SequenceVerdictError(verdict)
+        return self._commit_and_read_results(sequence, verdict, options)
+
+    # PC-114: commits, retrying after the poll interval while incomplete and attempts remain, then reads results
+    def _commit_and_read_results(
+        self, sequence: OpenedSequence, verdict: SequenceVerdictResponse, options: SequenceRegisterOptions
+    ) -> SequenceRegisterResult:
+        """Commit `sequence`, calling again after `options.poll_interval` while the outcome is
+        `incomplete` and attempts remain, then read its results."""
+        commit: SequenceCommitResponse = self.commit_sequence(sequence.handle)
+        attempt = 1
+        while commit.outcome == OUTCOME_INCOMPLETE:
+            if attempt >= options.commit_attempts:
+                raise SequenceCommitError(commit)
+            time.sleep(options.poll_interval)
+            commit = self.commit_sequence(sequence.handle)
+            attempt += 1
+
+        results = self.get_sequence_results(sequence.handle)
+        return SequenceRegisterResult(sequence, verdict, commit, results)

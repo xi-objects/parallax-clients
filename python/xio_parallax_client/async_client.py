@@ -56,7 +56,7 @@ from .generated.models import (
 )
 from .multipart import ImageUpload, ManifestPart
 from .options import ParallaxClientOptions
-from .sequences.async_routes import AsyncSequenceRoutes
+from .sequences.async_conversation import AsyncSequenceConversation
 from .slots import (
     LookupBatchOptions,
     LookupBatchResult,
@@ -67,7 +67,8 @@ from .slots import (
 )
 
 
-class AsyncParallaxClient(AsyncSequenceRoutes):
+# PC-114: AsyncParallaxClient composes AsyncSequenceConversation, which composes AsyncSequenceRoutes in turn
+class AsyncParallaxClient(AsyncSequenceConversation):
     """Asynchronous mirror of `ParallaxClient`, built on the generated `AuthenticatedClient`'s async httpx client."""
 
     # PC-113: frame_codec resolved once, through resolve_frame_codec, and held as client.frame_codec

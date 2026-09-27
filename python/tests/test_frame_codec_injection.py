@@ -1,20 +1,30 @@
 """The PX Frame seam at the route level: default resolution, a non-codec's refusal, and who may
-import the pure binding at all.
+import the pure binding at all; plus the register-conversation injection case, a `FakeCodec`
+driving `register_sequence` end to end.
 
-The register-conversation injection case (a `FakeCodec` driving `register_sequence` end to end)
-lands with PC-114; this file covers what PC-113 owns: the resolution rule itself and the seam's
-import graph, walked with `ast` rather than a hand-maintained list of modules.
+The route-level cases (the resolution rule itself and the seam's import graph, walked with `ast`
+rather than a hand-maintained list of modules) are PC-113's; the register case at the bottom of
+this file is PC-114's.
 """
 
 from __future__ import annotations
 
 import ast
+import base64
 from pathlib import Path
+from uuid import uuid4
 
+import httpx
 import pytest
+import respx
 from xio_parallax_client import AsyncParallaxClient, ParallaxClient, ParallaxClientOptions
 from xio_parallax_client.frames.binding import default_frame_codec, resolve_frame_codec
+from xio_parallax_client.frames.protocol import EncodedPxFrame, PxFrame, PxFrameAccepted, PxHeadHeader
 from xio_parallax_client.frames.pure import PurePxFrameCodec
+
+from .conftest import BASE_URL
+from .sequence_server import multipart_parts
+from .test_register_sequence import register_options, source
 
 _PACKAGE_ROOT = Path(__file__).resolve().parents[1] / "xio_parallax_client"
 _PACKAGE_NAME = "xio_parallax_client"
@@ -167,3 +177,96 @@ def test_a_full_duck_typed_codec_is_used_unchanged(options: ParallaxClientOption
     fake = FakeCodec()
     client = ParallaxClient(options, frame_codec=fake)
     assert client.frame_codec is fake
+
+
+# PC-114: a codec whose bytes are legible, so a register conversation's own bytes can be asserted directly
+class FakeSequenceCodec:
+    """Implements `PxFrameCodec`; `encode` answers `b"FAKE:<type>:<id>:<prev>"`, `decode` answers
+    any bytes as a HEAD frame with id 7, regardless of what was actually encoded."""
+
+    format_version = 1
+
+    def encode(self, header: object, buckets: object) -> EncodedPxFrame:
+        """Encode a legible marker instead of a real PX Frame: type, id and prev, `buckets` unused."""
+        prev = getattr(header, "prev", None)
+        frame = f"FAKE:{header.frame_type.name}:{header.frame_id}:{prev}".encode()
+        return EncodedPxFrame(frame, frame_hash=frame.ljust(32, b"\x00")[:32])
+
+    def decode(self, frame: bytes) -> PxFrameAccepted:
+        """Decode any bytes as a HEAD frame with id 7; open's HEAD decode is the only caller here."""
+        header = PxHeadHeader(uuid4(), 7)
+        return PxFrameAccepted(PxFrame(header=header, buckets=(), frame_hash=b"\x00" * 32))
+
+    def build_chain(self, members: object) -> object:
+        raise NotImplementedError
+
+    def compute_sequence_hash(self, body_frame_hashes: object) -> object:
+        raise NotImplementedError
+
+
+@respx.mock
+def test_register_sequence_uses_only_the_injected_codec(options: ParallaxClientOptions) -> None:
+    """`register_sequence` reads HEAD's id through the injected codec alone (7, not the real one)
+    and every uploaded part's bytes are exactly the fake codec's, never the default binding's."""
+    sequence_id = uuid4()
+    respx.post(f"{BASE_URL}/sequences").mock(
+        return_value=httpx.Response(
+            201,
+            json={
+                "sequenceId": str(sequence_id),
+                "ticket": "sequence-ticket-fake-codec",
+                "headFrame": base64.b64encode(b"whatever a real decoder would refuse").decode("ascii"),
+            },
+        )
+    )
+
+    def frames_side_effect(request: httpx.Request) -> httpx.Response:
+        parts = multipart_parts(request)
+        ids = [int(name) for name, _ in parts]
+        verdict = None
+        if 9 in ids:
+            verdict = {
+                "state": "sealed",
+                "framesReceived": 9,
+                "expectedSize": None,
+                "reach": 9,
+                "gaps": [],
+                "errata": [],
+                "connected": True,
+            }
+        return httpx.Response(201, json={"frames": [{"frameId": i, "errata": False} for i in ids], "verdict": verdict})
+
+    respx.post(f"{BASE_URL}/sequences/{sequence_id}/frames").mock(side_effect=frames_side_effect)
+    respx.post(f"{BASE_URL}/sequences/{sequence_id}/commit").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "sequenceHash": "sequence-hash",
+                "outcome": "registered",
+                "sequenceRecordPublished": True,
+                "frames": [{"frameId": 1, "state": "published", "originalImageHash": None, "refusalName": None}],
+            },
+        )
+    )
+    respx.get(f"{BASE_URL}/sequences/{sequence_id}/results").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "sequenceHash": "sequence-hash",
+                "outcome": "registered",
+                "finalSize": 1,
+                "committedAt": "2026-09-27T00:00:00Z",
+            },
+        )
+    )
+
+    client = ParallaxClient(options, frame_codec=FakeSequenceCodec())
+
+    result = client.register_sequence(source(8), register_options(max_frames_per_request=8))
+
+    frames_calls = [call for call in respx.calls if call.request.url.path == f"/sequences/{sequence_id}/frames"]
+    first_batch = multipart_parts(frames_calls[0].request)
+    second_batch = multipart_parts(frames_calls[1].request)
+    assert first_batch == [("8", b"FAKE:BODY:8:7")]
+    assert second_batch == [("9", b"FAKE:END:9:8")]
+    assert result.commit.outcome == "registered"

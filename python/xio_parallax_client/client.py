@@ -51,7 +51,7 @@ from .generated.models import (
 )
 from .multipart import ImageUpload, ManifestPart
 from .options import ParallaxClientOptions
-from .sequences.routes import SequenceRoutes
+from .sequences.conversation import SequenceConversation
 from .slots import (
     LookupBatchOptions,
     LookupBatchResult,
@@ -62,12 +62,14 @@ from .slots import (
 )
 
 
-class ParallaxClient(SequenceRoutes):
+# PC-114: ParallaxClient composes SequenceConversation, which composes SequenceRoutes in turn
+class ParallaxClient(SequenceConversation):
     """Synchronous client for the XI Parallax REST API.
 
     Wraps the generated `AuthenticatedClient` (`.api`) with the things a generator cannot give:
     multipart parts named `manifest[<kind>]`, typed `ParallaxProblem` refusals, the slot
-    conversations as one call each, and the sequence route members (`SequenceRoutes`).
+    conversations as one call each, and the sequence conversation (`SequenceConversation`, itself
+    built on the nine route members of `SequenceRoutes`).
     """
 
     # PC-113: frame_codec resolved once, through resolve_frame_codec, and held as client.frame_codec

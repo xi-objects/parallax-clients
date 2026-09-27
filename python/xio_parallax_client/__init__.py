@@ -6,6 +6,7 @@ as one call each, and typed `application/problem+json` refusals; plus the embedd
 store detection and the manifest selection resolved over a whole collection before anything is sent.
 """
 
+# PC-114: the public sequence conversation and frame source names
 from .async_client import AsyncParallaxClient
 from .c2pa import (
     C2paCarrier,
@@ -20,6 +21,7 @@ from .c2pa import (
     detect_embedded_c2pa,
 )
 from .client import ParallaxClient
+from .frames import AsyncSequenceFrameSource, SequenceFrameInput, SequenceFrameSource
 from .hashing import sha256_hex
 from .manifests import (
     NO_MANIFESTS,
@@ -33,7 +35,19 @@ from .manifests import (
 )
 from .multipart import ImageUpload, ManifestForm, ManifestPart
 from .options import ParallaxClientOptions, UploadBatching
-from .problems import ParallaxClientError, ParallaxProblem
+from .problems import ParallaxClientError, ParallaxProblem, SequencesNotEnabled
+from .sequences import (
+    EncodedFrame,
+    OpenedSequence,
+    SequenceBatching,
+    SequenceCommitError,
+    SequenceHandle,
+    SequenceOpenRequest,
+    SequenceRegisterOptions,
+    SequenceRegisterResult,
+    SequenceVerdictError,
+    VerdictCallback,
+)
 from .slots import (
     LookupBatchOptions,
     LookupBatchResult,
@@ -46,12 +60,14 @@ from .slots import (
 __all__ = [
     "NO_MANIFESTS",
     "AsyncParallaxClient",
+    "AsyncSequenceFrameSource",
     "C2paCarrier",
     "C2paComparison",
     "C2paComparisonOutcome",
     "EmbeddedC2paOutcome",
     "EmbeddedC2paResult",
     "EmbeddedC2paStore",
+    "EncodedFrame",
     "ImageUpload",
     "JumbfBoxSummary",
     "LookupBatchOptions",
@@ -62,6 +78,7 @@ __all__ = [
     "ManifestRefusalError",
     "ManifestRequest",
     "ManifestSelection",
+    "OpenedSequence",
     "ParallaxClient",
     "ParallaxClientError",
     "ParallaxClientOptions",
@@ -70,8 +87,19 @@ __all__ = [
     "RegisterBatchOptions",
     "RegisterBatchResult",
     "RegistrationItem",
+    "SequenceBatching",
+    "SequenceCommitError",
+    "SequenceFrameInput",
+    "SequenceFrameSource",
+    "SequenceHandle",
+    "SequenceOpenRequest",
+    "SequenceRegisterOptions",
+    "SequenceRegisterResult",
+    "SequenceVerdictError",
+    "SequencesNotEnabled",
     "SidecarManifest",
     "UploadBatching",
+    "VerdictCallback",
     "as_manifest_part",
     "compare_with_record",
     "detect_embedded_c2pa",
