@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Xio.Parallax.Rest",
-    "version": "1.0.0+acd6474"
+    "version": "1.0.0+29a207ab3ba943bcc93558efc364b4ce7eb24f3c"
   },
   "servers": [
     {
@@ -147,10 +147,10 @@
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "description": "One image to register. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes.",
+                      "description": "One image to register. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by the calling account's maxImageBytes and the whole request by its maxRequestBytes, both set by the admin.",
                       "format": "binary"
                     },
-                    "description": "One image to register. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes."
+                    "description": "One image to register. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by the calling account's maxImageBytes and the whole request by its maxRequestBytes, both set by the admin."
                   }
                 }
               },
@@ -583,7 +583,7 @@
         "tags": [
           "Usage"
         ],
-        "summary": "Report the calling account's own grants, what it has spent and its lifetime call count.",
+        "summary": "Report the calling account's own grants, what it has spent, its lifetime call count and its limits.",
         "responses": {
           "200": {
             "description": "OK",
@@ -779,7 +779,7 @@
                   },
                   "image": {
                     "type": "string",
-                    "description": "The one image to register. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes.",
+                    "description": "The one image to register. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by the calling account's maxImageBytes and the whole request by its maxRequestBytes, both set by the admin.",
                     "format": "binary"
                   }
                 }
@@ -1206,6 +1206,82 @@
         ]
       }
     },
+    "/admin/accounts/{accountId}": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Replace an existing account's grants and limit values.",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "AdminKey": [ ]
+          }
+        ]
+      }
+    },
     "/slots": {
       "post": {
         "tags": [
@@ -1378,10 +1454,10 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "description": "The query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes.",
+                    "description": "The query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by the calling account's maxImageBytes and the whole request by its maxRequestBytes, both set by the admin.",
                     "format": "binary"
                   },
-                  "description": "The query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes."
+                  "description": "The query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by the calling account's maxImageBytes and the whole request by its maxRequestBytes, both set by the admin."
                 }
               }
             }
@@ -1547,10 +1623,10 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "description": "One query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes.",
+                    "description": "One query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by the calling account's maxImageBytes and the whole request by its maxRequestBytes, both set by the admin.",
                     "format": "binary"
                   },
-                  "description": "One query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by SlotUpload:MaxImageBytes and the whole request by SlotUpload:MaxRequestBytes."
+                  "description": "One query image. Its part name carries no meaning. Its content type must be one of SlotUpload:AllowedContentTypes; one image is bounded by the calling account's maxImageBytes and the whole request by its maxRequestBytes, both set by the admin."
                 }
               }
             }
@@ -2277,6 +2353,809 @@
           }
         ]
       }
+    },
+    "/sequences": {
+      "post": {
+        "tags": [
+          "Sequences"
+        ],
+        "summary": "Open a sequence for the calling account.",
+        "requestBody": {
+          "description": "An optional expectedSize field (advisory, never compared with a limit) and zero or more manifest parts.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedSize": {
+                    "type": "string",
+                    "description": "Advisory expected frame count; when present, a positive integer."
+                  },
+                  "manifest[<kind>]": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "A manifest attached to the sequence. Manifest kind must be 1 to 64 characters of A-Z, a-z, 0-9, '.', '_' or '-'. The part's own Content-Type gives the manifest's form, with no default. One part is bounded by SlotUpload:MaxManifestBytes and one image carries at most SlotUpload:MaxManifestsPerImage of them."
+                    },
+                    "description": "A manifest attached to the sequence. Manifest kind must be 1 to 64 characters of A-Z, a-z, 0-9, '.', '_' or '-'. The part's own Content-Type gives the manifest's form, with no default. One part is bounded by SlotUpload:MaxManifestBytes and one image carries at most SlotUpload:MaxManifestsPerImage of them."
+                  }
+                }
+              },
+              "encoding": {
+                "manifest[<kind>]": {
+                  "contentType": "application/json, application/jumbf, application/c2pa"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SequenceOpenResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/sequences/{sequenceId}/frames": {
+      "post": {
+        "tags": [
+          "Sequences"
+        ],
+        "summary": "Admit one or more PX BODY frames to the sequence as one batch, all or nothing; a sealing batch's 201 carries the verdict.",
+        "description": "The sequence's state is one of: open, sealed, committed, abandoned.",
+        "parameters": [
+          {
+            "name": "X-Sequence-Ticket",
+            "in": "header",
+            "description": "The caller's sequence ticket, minted when the sequence was opened. A missing or unverifiable ticket refuses with 403; a ticket that verifies for another sequence or account refuses the same way.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "One or more PX BODY frames, each its own application/octet-stream file part; a single part is a batch of one. Bounded by the calling account's own maxRequestBytes.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "One PX BODY frame's own bytes.",
+                    "format": "binary"
+                  },
+                  "description": "One PX BODY frame's own bytes."
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SequenceFrameBatchResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/sequences/{sequenceId}/frames/{frameId}": {
+      "delete": {
+        "tags": [
+          "Sequences"
+        ],
+        "summary": "Remove one BODY member from the sequence.",
+        "parameters": [
+          {
+            "name": "frameId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "X-Sequence-Ticket",
+            "in": "header",
+            "description": "The caller's sequence ticket, minted when the sequence was opened. A missing or unverifiable ticket refuses with 403; a ticket that verifies for another sequence or account refuses the same way.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/sequences/{sequenceId}/gaps": {
+      "get": {
+        "tags": [
+          "Sequences"
+        ],
+        "summary": "Answer one minted GAP frame per range the sequence's current chain carries.",
+        "parameters": [
+          {
+            "name": "X-Sequence-Ticket",
+            "in": "header",
+            "description": "The caller's sequence ticket, minted when the sequence was opened. A missing or unverifiable ticket refuses with 403; a ticket that verifies for another sequence or account refuses the same way.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SequenceGapsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/sequences/{sequenceId}/progress": {
+      "get": {
+        "tags": [
+          "Sequences"
+        ],
+        "summary": "Answer the sequence's current verdict: state, frames received, expected size, reach, gaps, errata and connected.",
+        "description": "The sequence's state is one of: open, sealed, committed, abandoned.",
+        "parameters": [
+          {
+            "name": "X-Sequence-Ticket",
+            "in": "header",
+            "description": "The caller's sequence ticket, minted when the sequence was opened. A missing or unverifiable ticket refuses with 403; a ticket that verifies for another sequence or account refuses the same way.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SequenceVerdictResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/sequences/{sequenceId}/expected-size": {
+      "put": {
+        "tags": [
+          "Sequences"
+        ],
+        "summary": "Amend the sequence's advisory expected size.",
+        "parameters": [
+          {
+            "name": "X-Sequence-Ticket",
+            "in": "header",
+            "description": "The caller's sequence ticket, minted when the sequence was opened. A missing or unverifiable ticket refuses with 403; a ticket that verifies for another sequence or account refuses the same way.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SequenceAmendExpectedSizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/sequences/{sequenceId}": {
+      "delete": {
+        "tags": [
+          "Sequences"
+        ],
+        "summary": "Abandon the sequence at once, purging its pool and closing its custody ledger.",
+        "parameters": [
+          {
+            "name": "X-Sequence-Ticket",
+            "in": "header",
+            "description": "The caller's sequence ticket, minted when the sequence was opened. A missing or unverifiable ticket refuses with 403; a ticket that verifies for another sequence or account refuses the same way.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SequenceAbandonResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/sequences/{sequenceId}/commit": {
+      "post": {
+        "tags": [
+          "Sequences"
+        ],
+        "summary": "Commit a sealed sequence to the engine.",
+        "description": "The outcome is one of: registered, alreadyRegistered, incomplete. \"incomplete\" says the sequence record was not written this call - a BODY is still unpublished or the record call itself was refused - and the client retries the same call.",
+        "parameters": [
+          {
+            "name": "X-Sequence-Ticket",
+            "in": "header",
+            "description": "The caller's sequence ticket, minted when the sequence was opened. A missing or unverifiable ticket refuses with 403; a ticket that verifies for another sequence or account refuses the same way.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SequenceCommitResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/sequences/{sequenceId}/results": {
+      "get": {
+        "tags": [
+          "Sequences"
+        ],
+        "summary": "Read a committed sequence's own record.",
+        "description": "The outcome is one of: registered, alreadyRegistered.",
+        "parameters": [
+          {
+            "name": "X-Sequence-Ticket",
+            "in": "header",
+            "description": "The caller's sequence ticket, minted when the sequence was opened. A missing or unverifiable ticket refuses with 403; a ticket that verifies for another sequence or account refuses the same way.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SequenceResultsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid credential was presented for the security scheme this operation requires. The problem names no reason: a missing, malformed, unknown, revoked and disabled credential are answered identically.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2288,6 +3167,24 @@
           "status",
           "registrationGrant",
           "lookupGrant",
+          "registrationSlotIdleTtl",
+          "registrationSlotAbsoluteTtl",
+          "maxOpenRegistrationSlots",
+          "lookupSlotIdleTtl",
+          "lookupSlotAbsoluteTtl",
+          "maxOpenLookupSlots",
+          "maxImageBytes",
+          "maxRequestBytes",
+          "maxQueryImagesPerLookupSlot",
+          "maxQueryImagesPerLookupRequest",
+          "maxFramesPerSequence",
+          "maxOpenSequences",
+          "sequenceIdleTtl",
+          "sequenceAbsoluteTtl",
+          "maxFrameBytes",
+          "acceptedUploadRate",
+          "inFlightAllowance",
+          "sequencesEnabled",
           "createdAt"
         ],
         "type": "object",
@@ -2317,6 +3214,128 @@
               "string"
             ],
             "format": "int32"
+          },
+          "registrationSlotIdleTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "registrationSlotAbsoluteTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "maxOpenRegistrationSlots": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lookupSlotIdleTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "lookupSlotAbsoluteTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "maxOpenLookupSlots": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxImageBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "maxRequestBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "maxQueryImagesPerLookupSlot": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxQueryImagesPerLookupRequest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxFramesPerSequence": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "maxOpenSequences": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "sequenceIdleTtl": {
+            "type": "string",
+            "description": "Not enforced yet (S17).",
+            "format": "duration"
+          },
+          "sequenceAbsoluteTtl": {
+            "type": "string",
+            "description": "Not enforced yet (S17).",
+            "format": "duration"
+          },
+          "maxFrameBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int64"
+          },
+          "acceptedUploadRate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "inFlightAllowance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "sequencesEnabled": {
+            "type": "boolean"
           },
           "createdAt": {
             "type": "string",
@@ -2367,11 +3386,173 @@
           }
         }
       },
+      "AccountStatsLimitsResponse": {
+        "required": [
+          "registrationGrant",
+          "lookupGrant",
+          "registrationSlotIdleTtl",
+          "registrationSlotAbsoluteTtl",
+          "maxOpenRegistrationSlots",
+          "lookupSlotIdleTtl",
+          "lookupSlotAbsoluteTtl",
+          "maxOpenLookupSlots",
+          "maxQueryImagesPerLookupSlot",
+          "maxQueryImagesPerLookupRequest",
+          "maxImageBytes",
+          "maxRequestBytes",
+          "maxFramesPerSequence",
+          "maxOpenSequences",
+          "sequenceIdleTtl",
+          "sequenceAbsoluteTtl",
+          "maxFrameBytes",
+          "acceptedUploadRate",
+          "inFlightAllowance"
+        ],
+        "type": "object",
+        "properties": {
+          "registrationGrant": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lookupGrant": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "registrationSlotIdleTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "registrationSlotAbsoluteTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "maxOpenRegistrationSlots": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lookupSlotIdleTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "lookupSlotAbsoluteTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "maxOpenLookupSlots": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxQueryImagesPerLookupSlot": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxQueryImagesPerLookupRequest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxImageBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "maxRequestBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "maxFramesPerSequence": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "maxOpenSequences": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "sequenceIdleTtl": {
+            "type": "string",
+            "description": "Not enforced yet (S17).",
+            "format": "duration"
+          },
+          "sequenceAbsoluteTtl": {
+            "type": "string",
+            "description": "Not enforced yet (S17).",
+            "format": "duration"
+          },
+          "maxFrameBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int64"
+          },
+          "acceptedUploadRate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "inFlightAllowance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          }
+        }
+      },
       "AccountStatsResponse": {
         "required": [
           "registrations",
           "lookups",
-          "callCount"
+          "callCount",
+          "limits"
         ],
         "type": "object",
         "properties": {
@@ -2388,6 +3569,9 @@
               "string"
             ],
             "format": "int32"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/AccountStatsLimitsResponse"
           }
         }
       },
@@ -2395,7 +3579,24 @@
         "required": [
           "name",
           "registrationGrant",
-          "lookupGrant"
+          "lookupGrant",
+          "registrationSlotIdleTtl",
+          "registrationSlotAbsoluteTtl",
+          "maxOpenRegistrationSlots",
+          "lookupSlotIdleTtl",
+          "lookupSlotAbsoluteTtl",
+          "maxOpenLookupSlots",
+          "maxImageBytes",
+          "maxRequestBytes",
+          "maxQueryImagesPerLookupSlot",
+          "maxQueryImagesPerLookupRequest",
+          "maxFramesPerSequence",
+          "maxOpenSequences",
+          "sequenceIdleTtl",
+          "sequenceAbsoluteTtl",
+          "maxFrameBytes",
+          "acceptedUploadRate",
+          "inFlightAllowance"
         ],
         "type": "object",
         "properties": {
@@ -2417,6 +3618,129 @@
               "string"
             ],
             "format": "int32"
+          },
+          "registrationSlotIdleTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "registrationSlotAbsoluteTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "maxOpenRegistrationSlots": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lookupSlotIdleTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "lookupSlotAbsoluteTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "maxOpenLookupSlots": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxImageBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "maxRequestBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "maxQueryImagesPerLookupSlot": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxQueryImagesPerLookupRequest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxFramesPerSequence": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "maxOpenSequences": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "sequenceIdleTtl": {
+            "type": "string",
+            "description": "Not enforced yet (S17).",
+            "format": "duration"
+          },
+          "sequenceAbsoluteTtl": {
+            "type": "string",
+            "description": "Not enforced yet (S17).",
+            "format": "duration"
+          },
+          "maxFrameBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int64"
+          },
+          "acceptedUploadRate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "inFlightAllowance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "sequencesEnabled": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -2424,7 +3748,8 @@
         "required": [
           "id",
           "accountId",
-          "slotId",
+          "subjectId",
+          "subjectKind",
           "poolKey",
           "imageHash",
           "kind",
@@ -2443,7 +3768,10 @@
             "type": "string",
             "format": "uuid"
           },
-          "slotId": {
+          "subjectId": {
+            "type": "string"
+          },
+          "subjectKind": {
             "type": "string"
           },
           "poolKey": {
@@ -2954,6 +4282,349 @@
           }
         }
       },
+      "SequenceAbandonResponse": {
+        "required": [
+          "sequenceId",
+          "state",
+          "packetsPurged"
+        ],
+        "type": "object",
+        "properties": {
+          "sequenceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "packetsPurged": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "SequenceAdmittedFrameResponse": {
+        "required": [
+          "frameId",
+          "errata"
+        ],
+        "type": "object",
+        "properties": {
+          "frameId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "errata": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SequenceAmendExpectedSizeRequest": {
+        "required": [
+          "expectedSize"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "SequenceCommitFrameResponse": {
+        "required": [
+          "frameId",
+          "state",
+          "originalImageHash",
+          "refusalName"
+        ],
+        "type": "object",
+        "properties": {
+          "frameId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "state": {
+            "type": "string"
+          },
+          "originalImageHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refusalName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SequenceCommitResponse": {
+        "required": [
+          "sequenceHash",
+          "outcome",
+          "sequenceRecordPublished",
+          "frames"
+        ],
+        "type": "object",
+        "properties": {
+          "sequenceHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "sequenceRecordPublished": {
+            "type": "boolean"
+          },
+          "frames": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SequenceCommitFrameResponse"
+            }
+          }
+        }
+      },
+      "SequenceErrataFrameResponse": {
+        "required": [
+          "frameId",
+          "originalImageHash"
+        ],
+        "type": "object",
+        "properties": {
+          "frameId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "originalImageHash": {
+            "type": "string"
+          }
+        }
+      },
+      "SequenceFrameBatchResponse": {
+        "required": [
+          "frames",
+          "verdict"
+        ],
+        "type": "object",
+        "properties": {
+          "frames": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SequenceAdmittedFrameResponse"
+            }
+          },
+          "verdict": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SequenceVerdictResponse"
+              }
+            ]
+          }
+        }
+      },
+      "SequenceGapRangeResponse": {
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "to": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "SequenceGapResponse": {
+        "required": [
+          "from",
+          "to",
+          "gapFrame"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "to": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "gapFrame": {
+            "type": "string"
+          }
+        }
+      },
+      "SequenceGapsResponse": {
+        "required": [
+          "gaps"
+        ],
+        "type": "object",
+        "properties": {
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SequenceGapResponse"
+            }
+          }
+        }
+      },
+      "SequenceOpenResponse": {
+        "required": [
+          "sequenceId",
+          "headFrame",
+          "ticket"
+        ],
+        "type": "object",
+        "properties": {
+          "sequenceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "headFrame": {
+            "type": "string"
+          },
+          "ticket": {
+            "type": "string"
+          }
+        }
+      },
+      "SequenceResultsResponse": {
+        "required": [
+          "sequenceHash",
+          "outcome",
+          "finalSize",
+          "committedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "sequenceHash": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "finalSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "committedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SequenceVerdictResponse": {
+        "required": [
+          "state",
+          "framesReceived",
+          "expectedSize",
+          "reach",
+          "gaps",
+          "errata",
+          "connected"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "framesReceived": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "expectedSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "reach": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SequenceGapRangeResponse"
+            }
+          },
+          "errata": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SequenceErrataFrameResponse"
+            }
+          },
+          "connected": {
+            "type": "boolean"
+          }
+        }
+      },
       "SlotCommitEntryResponse": {
         "required": [
           "imageHash",
@@ -3357,6 +5028,171 @@
             "format": "date-time"
           }
         }
+      },
+      "UpdateAccountRequest": {
+        "required": [
+          "registrationGrant",
+          "lookupGrant",
+          "registrationSlotIdleTtl",
+          "registrationSlotAbsoluteTtl",
+          "maxOpenRegistrationSlots",
+          "lookupSlotIdleTtl",
+          "lookupSlotAbsoluteTtl",
+          "maxOpenLookupSlots",
+          "maxImageBytes",
+          "maxRequestBytes",
+          "maxQueryImagesPerLookupSlot",
+          "maxQueryImagesPerLookupRequest",
+          "maxFramesPerSequence",
+          "maxOpenSequences",
+          "sequenceIdleTtl",
+          "sequenceAbsoluteTtl",
+          "maxFrameBytes",
+          "acceptedUploadRate",
+          "inFlightAllowance",
+          "sequencesEnabled"
+        ],
+        "type": "object",
+        "properties": {
+          "registrationGrant": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lookupGrant": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "registrationSlotIdleTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "registrationSlotAbsoluteTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "maxOpenRegistrationSlots": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lookupSlotIdleTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "lookupSlotAbsoluteTtl": {
+            "type": "string",
+            "format": "duration"
+          },
+          "maxOpenLookupSlots": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxImageBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "maxRequestBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "maxQueryImagesPerLookupSlot": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxQueryImagesPerLookupRequest": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxFramesPerSequence": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "maxOpenSequences": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "sequenceIdleTtl": {
+            "type": "string",
+            "description": "Not enforced yet (S17).",
+            "format": "duration"
+          },
+          "sequenceAbsoluteTtl": {
+            "type": "string",
+            "description": "Not enforced yet (S17).",
+            "format": "duration"
+          },
+          "maxFrameBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int64"
+          },
+          "acceptedUploadRate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "inFlightAllowance": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Not enforced yet (S17).",
+            "format": "int32"
+          },
+          "sequencesEnabled": {
+            "type": "boolean"
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -3388,6 +5224,9 @@
     },
     {
       "name": "Registrations"
+    },
+    {
+      "name": "Sequences"
     },
     {
       "name": "Shared"

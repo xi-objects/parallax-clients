@@ -1,0 +1,87 @@
+namespace Xio.Parallax.Client.Tests.Sequences.Services;
+
+// PC-104: what the register conversation refuses: the options, an oversized frame, an empty source
+// PC-104: a non-monotone id and an oversized frame are refused before any request carries the offending frame
+public sealed class RegisterSequenceRefusalTests
+{
+    [Fact]
+    public async Task Both_open_and_existing_set_throws_naming_both_before_any_request()
+    {
+        var server = await SequenceConversationServer.CreateAsync();
+        using var client = RegisterSequenceTests.BuildClient(server);
+        var options = RegisterSequenceTests.Options(maxFramesPerRequest: 8) with { Existing = server.Opened };
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => client.RegisterSequenceAsync(RegisterSequenceTests.Source(1), options, progress: null));
+
+        Assert.Contains("Open", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Existing", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(server.Calls);
+    }
+
+    [Fact]
+    public async Task Neither_open_nor_existing_set_throws_naming_both_before_any_request()
+    {
+        var server = await SequenceConversationServer.CreateAsync();
+        using var client = RegisterSequenceTests.BuildClient(server);
+        var options = RegisterSequenceTests.Options(maxFramesPerRequest: 8) with { Open = null };
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => client.RegisterSequenceAsync(RegisterSequenceTests.Source(1), options, progress: null));
+
+        Assert.Contains("Open", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Existing", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(server.Calls);
+    }
+
+    // PC-104: the oversized frame is refused before any request carries it; the batch before it may already have gone
+    [Fact]
+    public async Task A_frame_alone_above_max_request_bytes_throws_naming_its_id_and_no_request_carries_it()
+    {
+        var server = await SequenceConversationServer.CreateAsync();
+        using var client = RegisterSequenceTests.BuildClient(server);
+        var source = new FakeSequenceFrameSource(
+        [
+            SequenceFrameInput.ForImage(1, TimeSpan.Zero, new byte[] { 1 }),
+            SequenceFrameInput.ForImage(2, TimeSpan.Zero, new byte[] { 2 }),
+            SequenceFrameInput.ForImage(3, TimeSpan.Zero, new byte[4096]),
+        ]);
+        var options = RegisterSequenceTests.Options(maxFramesPerRequest: 1, maxRequestBytes: 2048);
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => client.RegisterSequenceAsync(source, options, progress: null));
+
+        Assert.Contains("frame 3", exception.Message, StringComparison.Ordinal);
+        Assert.Equal([[1L]], server.UploadedFrameIds());
+        Assert.DoesNotContain(server.Calls, call => call.EndsWith("/commit", StringComparison.Ordinal));
+    }
+
+    // PC-104: a non-monotone id is refused naming it, before any request carries it or the frame ahead of it
+    [Fact]
+    public async Task A_non_monotone_id_throws_naming_it_and_no_request_carries_it()
+    {
+        var server = await SequenceConversationServer.CreateAsync();
+        using var client = RegisterSequenceTests.BuildClient(server);
+        var options = RegisterSequenceTests.Options(maxFramesPerRequest: 1);
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => client.RegisterSequenceAsync(RegisterSequenceTests.Source(1, 2, 5, 4), options, progress: null));
+
+        Assert.Contains("frame id 4", exception.Message, StringComparison.Ordinal);
+        Assert.Equal([[1L]], server.UploadedFrameIds());
+        Assert.DoesNotContain(server.Calls, call => call.EndsWith("/commit", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task An_empty_source_on_a_fresh_open_throws_and_leaves_the_sequence_open()
+    {
+        var server = await SequenceConversationServer.CreateAsync();
+        using var client = RegisterSequenceTests.BuildClient(server);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.RegisterSequenceAsync(RegisterSequenceTests.Source(), RegisterSequenceTests.Options(maxFramesPerRequest: 8), progress: null));
+
+        Assert.Contains("at least one BODY", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(["POST /sequences"], server.Calls);
+    }
+}

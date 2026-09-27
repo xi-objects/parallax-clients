@@ -6,7 +6,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <IsPackable>true</IsPackable>
     <PackageId>Xio.Parallax.Client</PackageId>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <Authors>XI Objects</Authors>
     <Company>XI Objects</Company>
     <Description>.NET client for the XI Parallax REST API: image registration, look-up, published records and attribution verification.</Description>
@@ -20,6 +20,9 @@
   <ItemGroup>
     <PackageReference Include="Blake3" />
     <PackageReference Include="BouncyCastle.Cryptography" />
+    <!-- PC-102: composes Xio.Parallax.Common once, for the Sequences frame encoder -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Kiota.Bundle" />
+    <PackageReference Include="Xio.Parallax.Common" />
   </ItemGroup>
 </Project>

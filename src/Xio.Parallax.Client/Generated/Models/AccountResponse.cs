@@ -12,14 +12,40 @@ namespace Xio.Parallax.Client.Generated.Models
     public partial class AccountResponse : IAdditionalDataHolder, IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>Not enforced yet (S17).</summary>
+        public int? AcceptedUploadRate { get; set; }
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The createdAt property</summary>
         public DateTimeOffset? CreatedAt { get; set; }
         /// <summary>The id property</summary>
         public Guid? Id { get; set; }
+        /// <summary>Not enforced yet (S17).</summary>
+        public int? InFlightAllowance { get; set; }
         /// <summary>The lookupGrant property</summary>
         public int? LookupGrant { get; set; }
+        /// <summary>The lookupSlotAbsoluteTtl property</summary>
+        public TimeSpan? LookupSlotAbsoluteTtl { get; set; }
+        /// <summary>The lookupSlotIdleTtl property</summary>
+        public TimeSpan? LookupSlotIdleTtl { get; set; }
+        /// <summary>Not enforced yet (S17).</summary>
+        public long? MaxFrameBytes { get; set; }
+        /// <summary>Not enforced yet (S17).</summary>
+        public int? MaxFramesPerSequence { get; set; }
+        /// <summary>The maxImageBytes property</summary>
+        public long? MaxImageBytes { get; set; }
+        /// <summary>The maxOpenLookupSlots property</summary>
+        public int? MaxOpenLookupSlots { get; set; }
+        /// <summary>The maxOpenRegistrationSlots property</summary>
+        public int? MaxOpenRegistrationSlots { get; set; }
+        /// <summary>Not enforced yet (S17).</summary>
+        public int? MaxOpenSequences { get; set; }
+        /// <summary>The maxQueryImagesPerLookupRequest property</summary>
+        public int? MaxQueryImagesPerLookupRequest { get; set; }
+        /// <summary>The maxQueryImagesPerLookupSlot property</summary>
+        public int? MaxQueryImagesPerLookupSlot { get; set; }
+        /// <summary>The maxRequestBytes property</summary>
+        public long? MaxRequestBytes { get; set; }
         /// <summary>The name property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -30,6 +56,16 @@ namespace Xio.Parallax.Client.Generated.Models
 #endif
         /// <summary>The registrationGrant property</summary>
         public int? RegistrationGrant { get; set; }
+        /// <summary>The registrationSlotAbsoluteTtl property</summary>
+        public TimeSpan? RegistrationSlotAbsoluteTtl { get; set; }
+        /// <summary>The registrationSlotIdleTtl property</summary>
+        public TimeSpan? RegistrationSlotIdleTtl { get; set; }
+        /// <summary>Not enforced yet (S17).</summary>
+        public TimeSpan? SequenceAbsoluteTtl { get; set; }
+        /// <summary>Not enforced yet (S17).</summary>
+        public TimeSpan? SequenceIdleTtl { get; set; }
+        /// <summary>The sequencesEnabled property</summary>
+        public bool? SequencesEnabled { get; set; }
         /// <summary>The status property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -63,11 +99,29 @@ namespace Xio.Parallax.Client.Generated.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "acceptedUploadRate", n => { AcceptedUploadRate = n.GetIntValue(); } },
                 { "createdAt", n => { CreatedAt = n.GetDateTimeOffsetValue(); } },
                 { "id", n => { Id = n.GetGuidValue(); } },
+                { "inFlightAllowance", n => { InFlightAllowance = n.GetIntValue(); } },
                 { "lookupGrant", n => { LookupGrant = n.GetIntValue(); } },
+                { "lookupSlotAbsoluteTtl", n => { LookupSlotAbsoluteTtl = n.GetTimeSpanValue(); } },
+                { "lookupSlotIdleTtl", n => { LookupSlotIdleTtl = n.GetTimeSpanValue(); } },
+                { "maxFrameBytes", n => { MaxFrameBytes = n.GetLongValue(); } },
+                { "maxFramesPerSequence", n => { MaxFramesPerSequence = n.GetIntValue(); } },
+                { "maxImageBytes", n => { MaxImageBytes = n.GetLongValue(); } },
+                { "maxOpenLookupSlots", n => { MaxOpenLookupSlots = n.GetIntValue(); } },
+                { "maxOpenRegistrationSlots", n => { MaxOpenRegistrationSlots = n.GetIntValue(); } },
+                { "maxOpenSequences", n => { MaxOpenSequences = n.GetIntValue(); } },
+                { "maxQueryImagesPerLookupRequest", n => { MaxQueryImagesPerLookupRequest = n.GetIntValue(); } },
+                { "maxQueryImagesPerLookupSlot", n => { MaxQueryImagesPerLookupSlot = n.GetIntValue(); } },
+                { "maxRequestBytes", n => { MaxRequestBytes = n.GetLongValue(); } },
                 { "name", n => { Name = n.GetStringValue(); } },
                 { "registrationGrant", n => { RegistrationGrant = n.GetIntValue(); } },
+                { "registrationSlotAbsoluteTtl", n => { RegistrationSlotAbsoluteTtl = n.GetTimeSpanValue(); } },
+                { "registrationSlotIdleTtl", n => { RegistrationSlotIdleTtl = n.GetTimeSpanValue(); } },
+                { "sequenceAbsoluteTtl", n => { SequenceAbsoluteTtl = n.GetTimeSpanValue(); } },
+                { "sequenceIdleTtl", n => { SequenceIdleTtl = n.GetTimeSpanValue(); } },
+                { "sequencesEnabled", n => { SequencesEnabled = n.GetBoolValue(); } },
                 { "status", n => { Status = n.GetStringValue(); } },
             };
         }
@@ -78,11 +132,29 @@ namespace Xio.Parallax.Client.Generated.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("acceptedUploadRate", AcceptedUploadRate);
             writer.WriteDateTimeOffsetValue("createdAt", CreatedAt);
             writer.WriteGuidValue("id", Id);
+            writer.WriteIntValue("inFlightAllowance", InFlightAllowance);
             writer.WriteIntValue("lookupGrant", LookupGrant);
+            writer.WriteTimeSpanValue("lookupSlotAbsoluteTtl", LookupSlotAbsoluteTtl);
+            writer.WriteTimeSpanValue("lookupSlotIdleTtl", LookupSlotIdleTtl);
+            writer.WriteLongValue("maxFrameBytes", MaxFrameBytes);
+            writer.WriteIntValue("maxFramesPerSequence", MaxFramesPerSequence);
+            writer.WriteLongValue("maxImageBytes", MaxImageBytes);
+            writer.WriteIntValue("maxOpenLookupSlots", MaxOpenLookupSlots);
+            writer.WriteIntValue("maxOpenRegistrationSlots", MaxOpenRegistrationSlots);
+            writer.WriteIntValue("maxOpenSequences", MaxOpenSequences);
+            writer.WriteIntValue("maxQueryImagesPerLookupRequest", MaxQueryImagesPerLookupRequest);
+            writer.WriteIntValue("maxQueryImagesPerLookupSlot", MaxQueryImagesPerLookupSlot);
+            writer.WriteLongValue("maxRequestBytes", MaxRequestBytes);
             writer.WriteStringValue("name", Name);
             writer.WriteIntValue("registrationGrant", RegistrationGrant);
+            writer.WriteTimeSpanValue("registrationSlotAbsoluteTtl", RegistrationSlotAbsoluteTtl);
+            writer.WriteTimeSpanValue("registrationSlotIdleTtl", RegistrationSlotIdleTtl);
+            writer.WriteTimeSpanValue("sequenceAbsoluteTtl", SequenceAbsoluteTtl);
+            writer.WriteTimeSpanValue("sequenceIdleTtl", SequenceIdleTtl);
+            writer.WriteBoolValue("sequencesEnabled", SequencesEnabled);
             writer.WriteStringValue("status", Status);
             writer.WriteAdditionalData(AdditionalData);
         }

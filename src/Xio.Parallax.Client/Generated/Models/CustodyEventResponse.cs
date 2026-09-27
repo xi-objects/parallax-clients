@@ -54,13 +54,21 @@ namespace Xio.Parallax.Client.Generated.Models
 #else
         public string PoolKey { get; set; }
 #endif
-        /// <summary>The slotId property</summary>
+        /// <summary>The subjectId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public string? SlotId { get; set; }
+        public string? SubjectId { get; set; }
 #nullable restore
 #else
-        public string SlotId { get; set; }
+        public string SubjectId { get; set; }
+#endif
+        /// <summary>The subjectKind property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? SubjectKind { get; set; }
+#nullable restore
+#else
+        public string SubjectKind { get; set; }
 #endif
         /// <summary>The verifiedAbsentAt property</summary>
         public DateTimeOffset? VerifiedAbsentAt { get; set; }
@@ -97,7 +105,8 @@ namespace Xio.Parallax.Client.Generated.Models
                 { "kind", n => { Kind = n.GetStringValue(); } },
                 { "occurredAt", n => { OccurredAt = n.GetDateTimeOffsetValue(); } },
                 { "poolKey", n => { PoolKey = n.GetStringValue(); } },
-                { "slotId", n => { SlotId = n.GetStringValue(); } },
+                { "subjectId", n => { SubjectId = n.GetStringValue(); } },
+                { "subjectKind", n => { SubjectKind = n.GetStringValue(); } },
                 { "verifiedAbsentAt", n => { VerifiedAbsentAt = n.GetDateTimeOffsetValue(); } },
             };
         }
@@ -116,7 +125,8 @@ namespace Xio.Parallax.Client.Generated.Models
             writer.WriteStringValue("kind", Kind);
             writer.WriteDateTimeOffsetValue("occurredAt", OccurredAt);
             writer.WriteStringValue("poolKey", PoolKey);
-            writer.WriteStringValue("slotId", SlotId);
+            writer.WriteStringValue("subjectId", SubjectId);
+            writer.WriteStringValue("subjectKind", SubjectKind);
             writer.WriteDateTimeOffsetValue("verifiedAbsentAt", VerifiedAbsentAt);
             writer.WriteAdditionalData(AdditionalData);
         }

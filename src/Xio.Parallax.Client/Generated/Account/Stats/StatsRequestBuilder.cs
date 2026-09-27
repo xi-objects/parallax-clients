@@ -34,7 +34,7 @@ namespace Xio.Parallax.Client.Generated.Account.Stats
         {
         }
         /// <summary>
-        /// Report the calling account&apos;s own grants, what it has spent and its lifetime call count.
+        /// Report the calling account&apos;s own grants, what it has spent, its lifetime call count and its limits.
         /// </summary>
         /// <returns>A <see cref="global::Xio.Parallax.Client.Generated.Models.AccountStatsResponse"/></returns>
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
@@ -57,7 +57,7 @@ namespace Xio.Parallax.Client.Generated.Account.Stats
             return await RequestAdapter.SendAsync<global::Xio.Parallax.Client.Generated.Models.AccountStatsResponse>(requestInfo, global::Xio.Parallax.Client.Generated.Models.AccountStatsResponse.CreateFromDiscriminatorValue, errorMapping, cancellationToken).ConfigureAwait(false);
         }
         /// <summary>
-        /// Report the calling account&apos;s own grants, what it has spent and its lifetime call count.
+        /// Report the calling account&apos;s own grants, what it has spent, its lifetime call count and its limits.
         /// </summary>
         /// <returns>A <see cref="RequestInformation"/></returns>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>

@@ -16,6 +16,7 @@ using Xio.Parallax.Client.Generated.Health;
 using Xio.Parallax.Client.Generated.Lookup;
 using Xio.Parallax.Client.Generated.Records;
 using Xio.Parallax.Client.Generated.Registrations;
+using Xio.Parallax.Client.Generated.Sequences;
 using Xio.Parallax.Client.Generated.Slots;
 namespace Xio.Parallax.Client.Generated
 {
@@ -54,6 +55,11 @@ namespace Xio.Parallax.Client.Generated
         public global::Xio.Parallax.Client.Generated.Registrations.RegistrationsRequestBuilder Registrations
         {
             get => new global::Xio.Parallax.Client.Generated.Registrations.RegistrationsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The sequences property</summary>
+        public global::Xio.Parallax.Client.Generated.Sequences.SequencesRequestBuilder Sequences
+        {
+            get => new global::Xio.Parallax.Client.Generated.Sequences.SequencesRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The slots property</summary>
         public global::Xio.Parallax.Client.Generated.Slots.SlotsRequestBuilder Slots

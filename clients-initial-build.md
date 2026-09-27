@@ -329,6 +329,9 @@ examples/dotnet/GettingStarted/  examples/python/getting_started.py
 5. **C2PA detection and comparison** — brief 2, at the bytes level (done 2026-09-22; proven
    live: attach then MATCH, not attach then ABSENT_FROM_RECORD).
 6. **At the source** — operationIds and strict integers in the API repository, when convenient.
+7. **Sequences** — the .NET client's frame-by-frame conversation and `ISequenceFrameSource`, the
+   interface later ingestion implements, proven by a stand-in directory-of-images example
+   (done 2026-09-26; see `## sequences (2026-09-26)` below).
 
 ## decisions (owner rulings, 2026-09-22)
 
@@ -438,4 +441,160 @@ examples/dotnet/GettingStarted/  examples/python/getting_started.py
   and refuses to batch without them rather than guessing.
 - One repository, one root solution and one root `pyproject.toml`; the Python package's sources
   live under `python/` through hatchling's package mapping.
+
+## sequences (2026-09-26)
+
+The .NET client's sequence conversation: the API's frame-by-frame registration route, alongside
+the batch and single-shot conversations the rest of this file covers. .NET only for now; the
+Python client is untouched, and no parity between the two is required while sequences are under
+active development. `xio_parallax_rest`'s `sequences-initial-build.md` (rulings S1-S19) is the
+design of record for the sequence workflow itself; this section is this repository's design of
+record for the client that consumes it, superseding the standalone `sequences-design.md` note it
+was cut from (removed once this section landed).
+
+### the brief (owner, 2026-09-26)
+
+The client must support the sequence workflow the API now serves. HOW video is decoded into
+distinct frames is set down for later; this build cuts the internal service layer and the
+interface a later ingestion implements, proven by a stand-in example that reads a directory of
+already-decoded image files as one sequence's frames.
+
+### the contract as surveyed (2026-09-26, live document 1.0.0+29a207a)
+
+- `POST /sequences` (multipart: optional `expectedSize`, `manifest[<kind>]` parts as the slot
+  routes take them) -> 201 `SequenceOpenResponse { sequenceId, headFrame (the HEAD frame, base64),
+  ticket }`. The account's `sequences_enabled` gate answers 403 otherwise.
+- Every other route carries the header `X-Sequence-Ticket: <ticket>` (required).
+- `POST /sequences/{id}/frames` (multipart: one or more file parts, any part name, each one PX
+  BODY or END frame's bytes as `application/octet-stream`; the server reads only parts whose
+  Content-Disposition carries a file name, in request order; the whole request's Content-Length
+  bounded by the account's `maxRequestBytes`, 413 otherwise) -> 201
+  `SequenceFrameBatchResponse { frames [{frameId, errata}], verdict? }`; the verdict is present
+  when the batch sealed the sequence. All or nothing. 409 for a state the sequence refuses, 422
+  when an image could not be checked, 503 when no engine is configured.
+- `DELETE /sequences/{id}/frames/{frameId}` -> 204 (open only).
+- `GET /sequences/{id}/gaps` -> `SequenceGapsResponse { gaps [{from, to, gapFrame}] }`.
+- `GET /sequences/{id}/progress` -> `SequenceVerdictResponse { state, framesReceived,
+  expectedSize?, reach, gaps [{from, to}], errata [{frameId, originalImageHash}], connected }`.
+- `PUT /sequences/{id}/expected-size` `{ expectedSize }` -> 204.
+- `POST /sequences/{id}/commit` -> 200 `SequenceCommitResponse { sequenceHash?, outcome
+  (registered | alreadyRegistered | incomplete), sequenceRecordPublished, frames [{frameId, state,
+  originalImageHash?, refusalName?}] }`; 409 with the shortfalls when not committable;
+  `incomplete` is retried by calling commit again (the server resumes from the first unpublished
+  frame, S12).
+- `GET /sequences/{id}/results` -> 200 `SequenceResultsResponse { sequenceHash, outcome, finalSize,
+  committedAt }`; 409 before commit.
+- `DELETE /sequences/{id}` -> 200 `SequenceAbandonResponse { sequenceId, state, packetsPurged }`.
+
+The frame model (Xio.Parallax.Common 0.1.1 on nuget.org): HEAD (minted by REST, frame id 0), BODY
+(client, `PxBodyHeader(sequenceId, frameId, prev, next, sourceTimeOffsetMicroseconds)` plus
+buckets, the image under `PxFrameConstants.ImageBucketTag` "IMAG"), END (client,
+`PxEndHeader(sequenceId, frameId, prev)`), GAP (REST only). Frame ids are longs the client owns:
+monotone along the chain, every BODY's prev below its id and next above it, contiguity never
+required. `IXioPxFrameEncoder.EncodeAsync(XioEncodePxFrameRequest(header, buckets))` answers the
+frame bytes and the frame hash; `IXioPxFrameDecoder.DecodeAsync` reads one back (the HEAD from
+open is decoded, never assumed to be id 0).
+
+### the shape
+
+One domain, `Sequences/`, in `src/Xio.Parallax.Client` with `Models|Interfaces|Enums|Services` and
+namespaces following folders, built exactly as `Slots/` is: generated request builders under the
+hand-written layer, `ParallaxClient` partial classes, sealed records, typed problems through the
+existing `ExecuteAsync` and `ParallaxProblemException`, the multipart sender the slot upload uses,
+required options with no client-side default for any server cap.
+
+1. **The generated surface.** `openapi/v1.json` replaced by the live document and the .NET client
+   regenerated with Kiota 1.35.0 (`kiota generate` line of `scripts/generate.sh`; the Python half
+   of that script not run and `python/` not touched). `Xio.Parallax.Common` 0.1.1 (nuget.org,
+   pulling Xio.Crypto 1.0.8 from nuget.org) joins `Directory.Packages.props` and the client
+   project. Package version 0.4.0.
+2. **The frame source: the interface later ingestion implements.** `ISequenceFrameSource` —
+   `IAsyncEnumerable<SequenceFrameInput> ReadFramesAsync(CancellationToken)` yielding frames in
+   chain order. `SequenceFrameInput(long FrameId, TimeSpan SourceTimeOffset,
+   IReadOnlyList<PxBucketContent> Buckets)` with a factory `ForImage(frameId, offset, imageBytes)`
+   that puts the bytes under the image bucket tag. The source owns the ids (monotone, room
+   allowed) and says nothing about links: the client derives prev from the previous frame it read
+   (the HEAD's id for the first) and next from the following one (END's id for the last),
+   buffering one frame of lookahead. A source that yields a non-monotone id is refused, naming the
+   id, before that frame (or any batch holding it) is sent; batches before it may already have
+   been uploaded, exact retransmits being harmless on a later run.
+3. **The route members** on `ParallaxClient` (`Sequences/Services/ParallaxClient.Sequences.cs`),
+   one per operation, each one call: `OpenSequenceAsync(SequenceOpenRequest)` (manifests as
+   `ManifestPart`s through the existing multipart builder, optional expected size) returning
+   `OpenedSequence(Handle, HeadFrameId)` with the HEAD decoded through Common;
+   `UploadSequenceFramesAsync(SequenceHandle, IReadOnlyList<EncodedFrame>)` (each frame one
+   `application/octet-stream` file part, part name its id, file name `<frameId>.px`);
+   `RemoveSequenceFrameAsync`; `GetSequenceGapsAsync`; `GetSequenceProgressAsync`;
+   `AmendSequenceExpectedSizeAsync`; `CommitSequenceAsync`; `GetSequenceResultsAsync`;
+   `AbandonSequenceAsync`. `SequenceHandle(SequenceId, Ticket)` carries the ticket; the header is
+   set once, in one place, for every call. The ticket never reaches a log or an exception.
+4. **The conversation, one call**: `RegisterSequenceAsync(ISequenceFrameSource source,
+   SequenceRegisterOptions options, IProgress<SequenceVerdictResponse>? progress, ct)`: open (or
+   resume through `options.Existing`), read the source, encode each BODY through Common with its
+   links, upload in batches under `options.Batching` (`MaxRequestBytes`, bounding the whole
+   multipart body each request sends, part headers, boundaries and closing delimiter included,
+   and `MaxFramesPerRequest`, both required; a frame whose request alone exceeds
+   `MaxRequestBytes` is refused, naming it, before it or any batch holding it is sent), encode END
+   (id = the last BODY id + 1, prev = the last BODY id) and upload it as the sealing batch, take
+   the verdict it answers (an END batch answered without one did not seal, and is refused naming
+   the END id): not connected, any gap or any errata refuses with the verdict (typed
+   `SequenceVerdictException` carrying it) and nothing is committed; then commit, repeating while
+   the outcome is `incomplete` up to `options.CommitAttempts` with `options.PollInterval` between
+   attempts, then results. Returns `SequenceRegisterResult(Sequence, Verdict, Commit, Results)`,
+   `Sequence` the `OpenedSequence` the conversation ran in. Resume: `options.Existing` (the
+   `OpenedSequence` a first run answered: handle and HEAD id) reads progress and gaps first; when
+   the state is open the source is read again and only frames whose id lies in a gap or above the
+   reach are uploaded, then END; when sealed, only the gaps' fills; when committed, commit is
+   called again (it resumes) and results read. An account with the feature off, a refused batch
+   or a shortfall surface as the typed problem the server answered.
+5. **Example** `examples/dotnet/SequenceFromImages`: a directory of image files, in name order, as
+   the frame source (one image per frame, ids 1..n, the source time offset from a constant frame
+   interval the example states), registered through the conversation, then the results and one
+   look-up of a frame proving the round trip. It is the stand-in for the ingestion that comes
+   later and the proof the interface is enough.
+6. **Docs**: README gains a "Sequences" section (the interface, the conversation, resume, the
+   flag), CLAUDE.md's layout line names the `Sequences/` domain and the nuget.org Common
+   reference, this section itself.
+
+### rules that bind every story
+
+- Generated code is never edited; nothing in `python/` moves.
+- No client-side default for a server cap: request bytes, frames per request, poll interval,
+  commit attempts are required options; a missing one throws `ArgumentException` naming it.
+- Tickets and account tokens never reach a log, an exception message or a record's ToString.
+- Tests with the code: xunit, the existing `FakeHttpMessageHandler` scripting responses shaped
+  from the live document, a fake `ISequenceFrameSource`; encoding through the real Common encoder;
+  every acceptance criterion has a backing test; no test reads markdown.
+- The gate for every story: `dotnet build Xio.Parallax.Client.slnx -c Release`,
+  `dotnet format Xio.Parallax.Client.slnx --verify-no-changes`,
+  `dotnet test Xio.Parallax.Client.slnx -c Release --no-build`. Nothing Python runs.
+- Every change site carries its story key (PC-101 .. PC-106) in one line saying what.
+
+### ruled by the owner
+
+- **.NET only, for now (ruled 2026-09-26):** the sequence conversation lands in the .NET client
+  only; the Python client is untouched.
+- **No parity required during active development (ruled 2026-09-26):** sequences moving fast on
+  the API side means the two clients are allowed to diverge until the workflow settles; the
+  Python client catching up is a later, separate piece of work.
+- **Xio.Parallax.Common from nuget.org (ruled 2026-09-26):** the PX frame model and its
+  encoder/decoder are consumed as the published `Xio.Parallax.Common` 0.1.1 package (pulling
+  Xio.Crypto 1.0.8), both from nuget.org; nothing from a private feed.
+- **HOW video is decoded into frames is set down for later (ruled 2026-09-26):** this build cuts
+  `ISequenceFrameSource` as the seam a later ingestion implements; the client itself never decodes
+  video, and the shipped example stands in with an already-decoded directory of image files.
+- **No AI or assistant attribution anywhere in this repository (ruled 2026-09-26):** no co-author
+  trailer, no session line, no generated-by remark, in commit messages, code comments, docs or
+  examples.
+- **Errata refuse before commit (ruled 2026-09-26):** the server's commit refuses any errata frame
+  (REST `SequenceCommitService`), so the client treats errata in the sealing verdict exactly as it
+  treats gaps and not-connected: `RegisterSequenceAsync` throws `SequenceVerdictException`
+  carrying the verdict (its message names the gap count, the errata count and whether it is
+  connected) and commits nothing; the sequence stays sealed for the caller to abandon or to
+  resolve through take-down. `SequenceRegisterResult` carries no errata; the exception's verdict
+  carries the list.
+- **Refused before the offending frame is sent (ruled 2026-09-26):** the client streams the source
+  with one frame of lookahead, so a non-monotone id or an oversized frame is refused before that
+  frame (or any batch holding it) is sent; batches before it may already have been uploaded,
+  exact retransmits being harmless on a later run.
 
