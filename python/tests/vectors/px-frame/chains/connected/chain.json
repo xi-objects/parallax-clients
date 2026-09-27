@@ -1,0 +1,13 @@
+{
+  "sealed": true,
+  "connected": true,
+  "reach": "30",
+  "walk": [
+    "0",
+    "10",
+    "20",
+    "30"
+  ],
+  "gaps": [],
+  "sequenceHash": "00c309cf2de27b92c5915bbece0135c4749b60f499ac6c4aeff076c568bfb977"
+}

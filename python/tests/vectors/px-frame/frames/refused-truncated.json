@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "Truncated",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "f1ae55606e074e91a8548f2698955ebd0f2ca04735e5b844629cf4ccab3b7a11"
+}

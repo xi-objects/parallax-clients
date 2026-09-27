@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "BucketCountInvalid",
+  "type": "HEAD",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "be947b81e43c0d4a5e9161d02f486e1275f85b6a55bcadaed0dfbdabb067a5c8"
+}

@@ -77,35 +77,49 @@ report = AttributionVerifier(TrustRoots.from_orbital(orbital_url)).verify(record
 ```
 
 `AsyncParallaxClient` mirrors every call for asyncio. Refusals raise `ParallaxProblem`.
+`ParallaxClient` and `AsyncParallaxClient` also carry `register_sequence` / a frame-by-frame
+sequence conversation; see Sequences below.
 
 ## Sequences
 
 A sequence is a video registered frame by frame rather than as one upload: the API assembles
 BODY frames into a chain, seals it with an END frame, and commits it to one sequence hash the
-same way a batch commits to a slot. This is a .NET-only conversation for now; the Python client
-is untouched.
+same way a batch commits to a slot. Both clients support it.
 
-`ISequenceFrameSource` is the interface a later ingestion (something that decodes a video into
-frames) implements: `IAsyncEnumerable<SequenceFrameInput> ReadFramesAsync(CancellationToken)`,
-yielding frames in chain order. The source owns each frame's id (monotone, room between them is
-allowed) and its position within its own media (`SourceTimeOffset`); it says nothing about the
-links between frames — the client derives every frame's `prev` from the frame read immediately
+`ISequenceFrameSource` (.NET) / `SequenceFrameSource` and `AsyncSequenceFrameSource` (Python,
+`xio_parallax_client.frames`) is the interface a later ingestion (something that decodes a video
+into frames) implements: `IAsyncEnumerable<SequenceFrameInput> ReadFramesAsync(CancellationToken)`
+in .NET, `read_frames(self) -> Iterable[SequenceFrameInput]` (or, async,
+`read_frames_async(self) -> AsyncIterable[SequenceFrameInput]`) in Python, yielding frames in
+chain order. The source owns each frame's id (monotone, room between them is allowed) and its
+position within its own media (`SourceTimeOffset` / `source_time_offset`); it says nothing about
+the links between frames — the client derives every frame's `prev` from the frame read immediately
 before it (the sequence's HEAD id for the first) and its `next` from the frame read immediately
 after it, buffering one frame of lookahead. `SequenceFrameInput.ForImage(frameId, offset,
-imageBytes)` builds a frame carrying a single image bucket. A source that yields an id not above the
-one before it is refused, naming the id, before that frame (or any batch holding it) is sent;
-batches before it may already have been uploaded, and re-sending them on a later run is harmless.
+imageBytes)` / `SequenceFrameInput.for_image(frame_id, source_time_offset, image_bytes)` builds a
+frame carrying a single image bucket. A source that yields an id not above the one before it is
+refused, naming the id, before that frame (or any batch holding it) is sent; batches before it may
+already have been uploaded, and re-sending them on a later run is harmless.
 
-`RegisterSequenceAsync(source, options, progress)` is the whole conversation in one call: open a
-sequence (or resume the one named by `options.Existing`), read `source`, encode and upload its
-frames in batches under `options.Batching` (`MaxRequestBytes`, bounding each request's whole
-multipart body, and `MaxFramesPerRequest` — both required, with no client-side default for either
-server cap), seal the sequence with an END frame, commit it (retrying an incomplete commit up to
-`options.CommitAttempts`, waiting `options.PollInterval` between attempts) and read its results.
-`progress`, when given, is reported with every verdict the conversation reads along the way. A
-sealed verdict that is not connected, still has gaps or names errata frames throws
-`SequenceVerdictException` carrying the verdict, and nothing is committed: the sequence stays
-sealed for you to abandon or to resolve through take-down.
+In Python, the frame's own wire format — encoding, decoding, chain building and the sequence hash
+— sits behind one protocol, `xio_parallax_client.frames.PxFrameCodec`, so it can be swapped for a
+future codec library or native implementation without touching the conversation. Both clients take
+a keyword-only `frame_codec` on their constructor (`ParallaxClient(options, frame_codec=...)`,
+`AsyncParallaxClient(options, frame_codec=...)`); `None` resolves to the package's own pure-Python
+binding, and a codec missing part of the protocol is refused, naming every missing member.
+
+`RegisterSequenceAsync(source, options, progress)` / `register_sequence(source, options,
+on_verdict)` is the whole conversation in one call: open a sequence (or resume the one named by
+`options.Existing` / `options.existing`), read `source`, encode and upload its frames in batches
+under `options.Batching` / `options.batching` (`MaxRequestBytes` / `max_request_bytes`, bounding
+each request's whole multipart body, and `MaxFramesPerRequest` / `max_frames_per_request` — both
+required, with no client-side default for either server cap), seal the sequence with an END frame,
+commit it (retrying an incomplete commit up to `options.CommitAttempts` / `options.commit_attempts`,
+waiting `options.PollInterval` / `options.poll_interval` between attempts) and read its results.
+`progress` / `on_verdict`, when given, is called with every verdict the conversation reads along
+the way. A sealed verdict that is not connected, still has gaps or names errata frames throws
+`SequenceVerdictException` / raises `SequenceVerdictError` carrying the verdict, and nothing is
+committed: the sequence stays sealed for you to abandon or to resolve through take-down.
 
 ```csharp
 var options = new SequenceRegisterOptions(TimeSpan.FromSeconds(1), CommitAttempts: 5, batching)
@@ -116,23 +130,32 @@ var result = await client.RegisterSequenceAsync(source, options, progress);
 Console.WriteLine($"{result.Results.SequenceHash}: {result.Results.Outcome}");
 ```
 
-Resume after an interruption by calling `RegisterSequenceAsync` again with
-`options.Existing` set to the `OpenedSequence` a first run answered (or that `OpenSequenceAsync`
-answered directly), rather than `options.Open`: an open sequence gets only the frames inside a
-gap or above its reach, then the END frame; a sealed one gets only its gap fills; a committed one
-just has commit called again (the server resumes from the first unpublished frame) and its
-results read.
+```python
+options = SequenceRegisterOptions(poll_interval=1.0, commit_attempts=5, batching=batching,
+                                  open=SequenceOpenRequest(manifests, expected_size=frame_count))
+result = client.register_sequence(source, options, print_verdict)
+print(result.results.sequence_hash, result.results.outcome)
+```
+
+Resume after an interruption by calling `RegisterSequenceAsync` / `register_sequence` again with
+`options.Existing` / `options.existing` set to the `OpenedSequence` a first run answered (or that
+`OpenSequenceAsync` / `open_sequence` answered directly), rather than `options.Open` /
+`options.open`: an open sequence gets only the frames inside a gap or above its reach, then the
+END frame; a sealed one gets only its gap fills; a committed one just has commit called again (the
+server resumes from the first unpublished frame) and its results read.
 
 An account needs its `sequences_enabled` flag set; without it, opening a sequence is refused with
-the typed problem the server answers, the same as any other refusal.
+the typed problem the server answers — `ParallaxProblemException` in .NET, and in Python the typed
+`xio_parallax_client.problems.SequencesNotEnabled` (a `ParallaxProblem` subclass, matched by the
+problem's slug so `except ParallaxProblem` still catches it) — the same as any other refusal.
 
-`examples/dotnet/SequenceFromImages` is the stand-in for the ingestion that decodes a video into
-frames: it reads a directory of image files, in ordinal name order, as one sequence's frames
-(frame ids 1..n, each frame's source time offset the constant frame interval it is given),
-refusing any file whose extension is not an image's, registers them through
-`RegisterSequenceAsync`, prints every verdict, the sequence hash, the outcome and the final size
-(or, on a refused verdict, its errata frames), then looks its first image up through `LookupAsync`
-to prove the round trip.
+`examples/dotnet/SequenceFromImages` and `examples/python/sequence_from_images.py` are the
+stand-in for the ingestion that decodes a video into frames: each reads a directory of image files,
+in ordinal name order, as one sequence's frames (frame ids 1..n, each frame's source time offset
+the constant frame interval it is given), refusing any file whose extension is not an image's,
+registers them through the one-call conversation, prints every verdict, the sequence hash, the
+outcome and the final size (or, on a refused verdict, its errata frames), then looks its first
+image up to prove the round trip.
 
 ## The verifier
 
@@ -223,7 +246,8 @@ compare the found file with the recovered record. Each reads its inputs from env
 variables named in its header, including `PARALLAX_INCLUDE_EMBEDDED`; `.env.example` names them
 all, and a git-ignored `.env` holds your values. All of them have been run against the API's own
 e2e stack and against production, with the roots pinned from the live Orbital's `/info`.
-`examples/dotnet/SequenceFromImages` is described above, under Sequences.
+`examples/dotnet/SequenceFromImages` and `examples/python/sequence_from_images.py` are described
+above, under Sequences; each names its own environment variables in its header.
 
 ## Building
 
@@ -246,6 +270,11 @@ sh scripts/generate.sh
 `scripts/openapi-changed.py` tells whether two documents are the same contract, ignoring the
 build commit in `info.version`. There is no CI: nothing is shipped. `clients-initial-build.md`
 is the design of record.
+
+The Python PX Frame codec's conformance suite runs against test vectors vendored, unmodified,
+from `xio_parallax_common` at a pinned commit (`python/tests/vectors/px-frame/`, refreshed with
+`scripts/vendor-px-vectors.sh <checkout> <sha>`); they are XI Objects' own test material, redistributed as-is and
+not under this repository's MIT license — see `python/tests/vectors/px-frame/VECTORS.md`.
 
 ## Publishing
 

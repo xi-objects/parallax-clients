@@ -16,7 +16,16 @@ import httpx
 
 from . import multipart, problems
 from . import slots as slots_module
-from ._calls import ProgressCallback, _build_api, _parsed, _poll_for_record_async, _require_batching
+from ._calls import (
+    ProgressCallback,
+    _build_api,
+    _parsed,
+    _poll_for_record_async,
+    _poll_slot_progress_async,
+    _require_batching,
+)
+from .frames.binding import resolve_frame_codec
+from .frames.protocol import PxFrameCodec
 from .generated.api.lookup import (
     get_lookup_slots_lookup_slot_id_progress,
     get_lookup_slots_lookup_slot_id_results,
@@ -43,11 +52,11 @@ from .generated.models import (
     PublishedRecordsResponse,
     RegisterSingleResponse,
     ResumeRequestBody,
-    SlotProgressResponse,
     SlotUploadResponse,
 )
 from .multipart import ImageUpload, ManifestPart
 from .options import ParallaxClientOptions
+from .sequences.async_conversation import AsyncSequenceConversation
 from .slots import (
     LookupBatchOptions,
     LookupBatchResult,
@@ -58,12 +67,21 @@ from .slots import (
 )
 
 
-class AsyncParallaxClient:
+# PC-114: AsyncParallaxClient composes AsyncSequenceConversation, which composes AsyncSequenceRoutes in turn
+class AsyncParallaxClient(AsyncSequenceConversation):
     """Asynchronous mirror of `ParallaxClient`, built on the generated `AuthenticatedClient`'s async httpx client."""
 
-    def __init__(self, options: ParallaxClientOptions, httpx_client: httpx.AsyncClient | None = None) -> None:
+    # PC-113: frame_codec resolved once, through resolve_frame_codec, and held as client.frame_codec
+    def __init__(
+        self,
+        options: ParallaxClientOptions,
+        httpx_client: httpx.AsyncClient | None = None,
+        *,
+        frame_codec: PxFrameCodec | None = None,
+    ) -> None:
         self.options = options
         self.api = _build_api(options)
+        self.frame_codec = resolve_frame_codec(frame_codec)
         if httpx_client is not None:
             self.api.set_async_httpx_client(httpx_client)
 
@@ -168,7 +186,7 @@ class AsyncParallaxClient:
         )
         commit = _parsed(committed)
 
-        final_progress = await self._poll_progress(
+        final_progress = await _poll_slot_progress_async(
             lambda: get_slots_slot_id_progress.asyncio_detailed(slot_id=slot_id, client=self.api),
             options,
             on_progress,
@@ -258,30 +276,3 @@ class AsyncParallaxClient:
         if 200 <= int(response.status_code) < 300:
             return response
         raise problems.problem_from_response(response)
-
-    async def _poll_progress(
-        self,
-        fetch: Callable[[], Any],
-        options: RegisterBatchOptions,
-        on_progress: ProgressCallback | None,
-    ) -> SlotProgressResponse:
-        """Async mirror of `ParallaxClient._poll_progress`."""
-        delay = options.poll_interval
-        elapsed = 0.0
-        while True:
-            response = await fetch()
-            problems.raise_for_problem(response)
-            progress = _parsed(response)
-            if on_progress is not None:
-                on_progress(progress)
-            if slots_module.is_progress_terminal(progress):
-                return progress
-            if elapsed >= options.poll_timeout:
-                raise problems.ParallaxClientError(
-                    f"polling timed out after {elapsed:.3f}s (poll_timeout={options.poll_timeout}s) "
-                    "with entries still in state 'retry'"
-                )
-            wait = min(delay, options.poll_timeout - elapsed)
-            await asyncio.sleep(wait)
-            elapsed += wait
-            delay = slots_module.next_poll_delay(delay, options.poll_timeout)

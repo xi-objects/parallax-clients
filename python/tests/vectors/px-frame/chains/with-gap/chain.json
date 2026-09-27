@@ -1,0 +1,16 @@
+{
+  "sealed": true,
+  "connected": false,
+  "reach": "20",
+  "walk": [
+    "0",
+    "10",
+    "20"
+  ],
+  "gaps": [
+    {
+      "from": "30",
+      "to": "35"
+    }
+  ]
+}

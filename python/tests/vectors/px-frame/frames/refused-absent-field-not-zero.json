@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "AbsentFieldNotZero",
+  "type": "HEAD",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "0",
+  "frameHash": "9e85806ad408b84d9902f78705217fa2cd56e4ed743508d6b6061139b3a6d50c"
+}

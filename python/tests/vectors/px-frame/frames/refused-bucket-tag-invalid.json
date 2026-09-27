@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "BucketTagInvalid",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "20463fa37208f7b151cb7b60fe3e276fc474ef9f13804c2bfc750f05549e760d"
+}

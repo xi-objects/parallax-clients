@@ -1,0 +1,22 @@
+{
+  "expect": "accepted",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "20",
+  "prev": "10",
+  "next": "30",
+  "sourceTimeOffsetMicroseconds": "2000000",
+  "buckets": [
+    {
+      "tag": "IMAG",
+      "length": 8,
+      "hash": "277bb8774dbdd387e2287eb528035c1f9d37b4691c5200a8edfbebac2cfb3c33"
+    },
+    {
+      "tag": "DPTH",
+      "length": 5,
+      "hash": "eb3d5333e3ca6b7a2bed950666fdb26ee6e9e046cd9a531ebbefaa94b9f848e3"
+    }
+  ],
+  "frameHash": "77d9c8905f9b9766f322fdea8826ece2920e8051dacd1a4bf6cbcf69c69deae9"
+}

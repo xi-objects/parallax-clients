@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "LinkOrderInvalid",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "1581c62259fc3c5aff4b2eb5c589e6c77b772964a2fdf276346b927b0bca2283"
+}

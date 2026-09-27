@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "FrameHashMismatch",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "a1e5d6ce3d9bd45ab378b4322d8d63f8f5e9513fa897c35987f9fd8c2c717a3a"
+}

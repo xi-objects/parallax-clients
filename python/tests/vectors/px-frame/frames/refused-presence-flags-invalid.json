@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "PresenceFlagsInvalid",
+  "type": "END",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "60",
+  "frameHash": "b44b661507d155eb6e6bdda7a88d2449afa1ca4d6b98029d3162100a6eaa51ec"
+}

@@ -1,0 +1,8 @@
+{
+  "expect": "refused",
+  "reason": "UnsupportedVersion",
+  "type": "BODY",
+  "sequenceId": "01234567-89ab-cdef-0123-456789abcdef",
+  "frameId": "10",
+  "frameHash": "492206a0c88454a3ca8af8aab85318a74e06fc960b2400f2119450ab6f908eef"
+}
