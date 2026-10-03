@@ -20,4 +20,11 @@ internal static class VerificationComposition
                                                                                     SignatureChecker);
 
     internal static readonly ICertificateChainValidator ChainValidator = new CertificateChainValidator(PemParser);
+
+    // PC-119: the sequence record's summary preimage and the checker over it
+    internal static readonly ISequenceSummaryPreimageBuilder SummaryPreimageBuilder = new SequenceSummaryPreimageBuilder();
+
+    internal static readonly ISequenceSummaryChecker SequenceSummaryChecker = new SequenceSummaryChecker(Encoding,
+                                                                                                         SummaryPreimageBuilder,
+                                                                                                         SignatureChecker);
 }

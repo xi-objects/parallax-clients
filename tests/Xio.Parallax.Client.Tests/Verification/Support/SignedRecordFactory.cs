@@ -110,6 +110,65 @@ internal static class SignedRecordFactory
         };
     }
 
+    // PC-119: three frames listed in walk order, deliberately not frame-id order, so a verifier that sorted would fail
+    /// <summary>The frame ids a sequence record built by <see cref="CreateSequence"/> lists, in walk order.</summary>
+    internal static readonly long[] SequenceFrameIds = [96, 12, 40];
+
+    // PC-119: a sequence record as harness 0.16.0 publishes one - keyed by its sequence hash (BLAKE3-256 over the frame
+    // hashes in walk order), signed over that hash, and with its summary signed by the same leaf over the version-1
+    // summary preimage. signSummary false answers a sequence committed before summary signing.
+    /// <summary>Builds a fully signed sequence record.</summary>
+    internal static PublishedRecordResponse CreateSequence(TestPki pki, bool signSummary = true)
+    {
+        var key = pki.LeafKeys.Private;
+        var frames = SequenceFrameIds
+            .Select(id => new SequenceSummaryFrameEntry(id, Blake3Digest(Encoding.ASCII.GetBytes($"image-{id}")), Blake3Digest(Encoding.ASCII.GetBytes($"frame-{id}"))))
+            .ToArray();
+        var sequenceHash = Blake3Digest([.. frames.SelectMany(frame => frame.FrameHash.ToArray())]);
+        var summary = new XioSequenceSummaryPreimageRequest(sequenceHash, 1800, frames.Length, true, true, 172_790L, frames.Length, frames);
+
+        return new PublishedRecordResponse
+        {
+            OriginalImageHash = Convert.ToHexStringLower(sequenceHash),
+            Outcome = PublishedRecordOutcome.Published,
+            Manifests = [],
+            Verification = new PublishedRecordVerification
+            {
+                CanonicalVersion = 2,
+                ContentHash = Convert.ToHexStringLower(sequenceHash),
+                HashAlgorithm = "blake3-256",
+                SignatureAlgorithm = "ed25519",
+                SignedAtUtc = SignedAt,
+                PublicKey = ToBase64Url(pki.LeafPublicKey),
+                Signature = Sign(key, Preimages.Image(sequenceHash)),
+                LeafCertificate = pki.LeafPem,
+                CertificateChain = [pki.RootPem],
+                TrustContext = "test",
+                TrustVersion = 1,
+            },
+            Sequence = new PublishedSequence
+            {
+                ExpectedSize = summary.ExpectedSize,
+                FinalSize = summary.FinalSize,
+                Verdict = new PublishedSequenceVerdict
+                {
+                    Connected = summary.Connected,
+                    Sealed = summary.Sealed,
+                    Reach = summary.Reach,
+                    FramesReceived = summary.FramesReceived,
+                },
+                Frames = [.. frames.Select(frame => new PublishedSequenceFrame
+                {
+                    FrameId = frame.FrameId,
+                    OriginalImageHash = Convert.ToHexStringLower(frame.OriginalImageHash.Span),
+                    FrameHash = Convert.ToHexStringLower(frame.FrameHash.Span),
+                })],
+                SummaryPreimageVersion = signSummary ? 1 : null,
+                SummarySignature = signSummary ? Sign(key, new SequenceSummaryPreimageBuilder().Build(summary)) : null,
+            },
+        };
+    }
+
     /// <summary>Returns the BLAKE3-256 digest of the bytes.</summary>
     internal static byte[] Blake3Digest(byte[] bytes)
     {

@@ -58,6 +58,22 @@ public static class VerificationConstants
     /// <summary>The name of the certificate chain check.</summary>
     public const string CertificateChainCheck = "certificateChain";
 
+    // PC-119: a sequence record's two checks, and the one summary preimage version this verifier lays out
+    /// <summary>The name of a sequence record's check that BLAKE3-256 over its listed frame hashes, in order, is its <c>contentHash</c>.</summary>
+    public const string SequenceHashCheck = "sequenceHash";
+
+    /// <summary>The name of a sequence record's summary signature check.</summary>
+    public const string SummarySignatureCheck = "summarySignature";
+
+    /// <summary>The only sequence summary preimage version implemented; its byte leads the summary preimage.</summary>
+    public const byte ImplementedSummaryPreimageVersion = 0x01;
+
+    /// <summary>The summary preimage's domain-separation tag, ASCII, behind a big-endian uint16 length.</summary>
+    public const string SummaryPreimageTag = "px-sequence-summary";
+
+    /// <summary>The byte length of every version-1 summary preimage, whatever the sequence's length.</summary>
+    public const int SummaryPreimageLength = 115;
+
     /// <summary>The stand-in for an absent value in a check's detail or a refusal's message.</summary>
     internal const string AbsentValue = "(none)";
 

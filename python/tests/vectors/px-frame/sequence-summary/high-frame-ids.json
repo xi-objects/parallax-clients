@@ -1,0 +1,31 @@
+{
+  "description": "Frame ids beyond 2^31 and beyond 2^53, and reach at i64 max: a reader that parses ids through a double or an i32 fails this.",
+  "sequenceHash": "d6f5636ea2ab9ef9e0c611bc6501913441c513b17d04d0f298bcf6cdc6cc0cb1",
+  "expectedSize": 3,
+  "finalSize": 3,
+  "verdict": {
+    "connected": true,
+    "sealed": true,
+    "reach": "9223372036854775807",
+    "framesReceived": 3
+  },
+  "frames": [
+    {
+      "frameId": "2147483648",
+      "originalImageHash": "642766c7acfb892d48f411099dd8e770cf9841dbfdefbff29eeb25d1a3eb8a82",
+      "frameHash": "3ecb1c7f5dae1b0665219e9514dc0d9d169d7c7f507d9bd33f29f8e4c14d8d35"
+    },
+    {
+      "frameId": "4294967311",
+      "originalImageHash": "0c205cd511c96bf24914e6103ef3707f6f928883bf1a35dafc8ee1182e90488e",
+      "frameHash": "93a6b293d391e5db1dfe30dcc7ed106fb9841085c7576f7ff61b2b5765d11a61"
+    },
+    {
+      "frameId": "9007199254740993",
+      "originalImageHash": "0b5a8e11721361cf8f2fcc71932e66581dd8c4be06dc764c7b6c0887cc08f376",
+      "frameHash": "552992f9cd1841f40ca1777961c33762f3b9fb4fa9491ef4a53cdc581a5bb1aa"
+    }
+  ],
+  "framesDigest": "9080a25c54b911e93a66b5193293e6e35c56265b2a3fe78bf1525f352622b39c",
+  "preimage": "01001370782d73657175656e63652d73756d6d6172790020d6f5636ea2ab9ef9e0c611bc6501913441c513b17d04d0f298bcf6cdc6cc0cb101000000030000000301017fffffffffffffff00000003000000039080a25c54b911e93a66b5193293e6e35c56265b2a3fe78bf1525f352622b39c"
+}

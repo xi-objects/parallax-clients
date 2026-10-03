@@ -1,0 +1,8 @@
+{
+  "description": "The connected chain's two BODY frame hashes in the other order: a different hash, because the order is the preimage's.",
+  "bodyFrameHashesInWalkOrder": [
+    "1ccffa40958599a6486a806dac6b3062e83f189dfa4a3294092f477b8545f427",
+    "a458ac34c6a834b165a58ae5ba95f0569fe571ddbd18a9c0df8d9fd5323bac99"
+  ],
+  "sequenceHash": "e070d127130fc9900cc572de127a8024dc509fbe471e5f9d7dddc65b0143ba29"
+}

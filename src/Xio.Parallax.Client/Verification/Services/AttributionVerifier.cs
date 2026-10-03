@@ -5,7 +5,7 @@ public interface IAttributionVerifier
 {
     /// <summary>Verifies a published record.</summary>
     /// <returns>The verdict of every check.</returns>
-    /// <exception cref="VerificationRefusedException">No roots, no verification block, an unimplemented hash or signature algorithm, a canonical version other than 0 (legacy) or 2, or a content hash that is not a BLAKE3-256 hex digest.</exception>
+    /// <exception cref="VerificationRefusedException">No roots, no verification block, an unimplemented hash or signature algorithm, a canonical version other than 0 (legacy) or 2, a content hash that is not a BLAKE3-256 hex digest, or a sequence record's summary preimage version other than 1.</exception>
     VerificationReport Verify(XioVerifyRecordRequest request);
 }
 
@@ -18,6 +18,7 @@ public sealed class AttributionVerifier : IAttributionVerifier
     private readonly ISignatureChecker _signatureChecker;
     private readonly ICanonicalPreimageBuilder _preimageBuilder;
     private readonly ICertificateChainValidator _chainValidator;
+    private readonly ISequenceSummaryChecker _sequenceSummaryChecker;
 
     /// <summary>Creates the verifier over the built-in checks.</summary>
     public AttributionVerifier()
@@ -26,7 +27,8 @@ public sealed class AttributionVerifier : IAttributionVerifier
                VerificationComposition.ManifestChecker,
                VerificationComposition.SignatureChecker,
                VerificationComposition.PreimageBuilder,
-               VerificationComposition.ChainValidator)
+               VerificationComposition.ChainValidator,
+               VerificationComposition.SequenceSummaryChecker)
     {
     }
 
@@ -35,7 +37,8 @@ public sealed class AttributionVerifier : IAttributionVerifier
                                  IManifestChecker manifestChecker,
                                  ISignatureChecker signatureChecker,
                                  ICanonicalPreimageBuilder preimageBuilder,
-                                 ICertificateChainValidator chainValidator)
+                                 ICertificateChainValidator chainValidator,
+                                 ISequenceSummaryChecker sequenceSummaryChecker)
     {
         _admission = admission;
         _imageHashChecker = imageHashChecker;
@@ -43,6 +46,7 @@ public sealed class AttributionVerifier : IAttributionVerifier
         _signatureChecker = signatureChecker;
         _preimageBuilder = preimageBuilder;
         _chainValidator = chainValidator;
+        _sequenceSummaryChecker = sequenceSummaryChecker;
     }
 
     /// <inheritdoc/>
@@ -66,6 +70,14 @@ public sealed class AttributionVerifier : IAttributionVerifier
         checks.Add(_signatureChecker.Check(new XioSignatureCheckRequest(VerificationConstants.ImageSignatureCheck, admission.PublicKey, _preimageBuilder.Image(admission.ContentHash), verification.Signature)));
         checks.Add(_chainValidator.CheckLeafKey(new XioLeafKeyCheckRequest(verification.LeafCertificate, admission.PublicKey)));
         checks.Add(_chainValidator.CheckChain(new XioCertificateChainCheckRequest(verification.LeafCertificate, verification.CertificateChain, verification.SignedAtUtc, request.Roots)));
+
+        // PC-119: a sequence record also proves its frame list - the sequence hash over the listed frame hashes, and the
+        // summary signature binding each one's frame id and image; an image or frame record carries no summary to check
+        if (record.Sequence is { } sequence)
+        {
+            checks.AddRange(_sequenceSummaryChecker.Check(new XioSequenceSummaryCheckRequest(sequence, admission)));
+        }
+
         return new VerificationReport(checks);
     }
 

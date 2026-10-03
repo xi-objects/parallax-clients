@@ -1,0 +1,21 @@
+{
+  "description": "One frame and a reach of 0: an encoding edge, every numeric field at or near zero.",
+  "sequenceHash": "c178516da57a53de38ace67d8a4ce68fcd2c5d1d3d298ac7baf4138404c01dfb",
+  "expectedSize": 0,
+  "finalSize": 1,
+  "verdict": {
+    "connected": false,
+    "sealed": false,
+    "reach": "0",
+    "framesReceived": 1
+  },
+  "frames": [
+    {
+      "frameId": "1",
+      "originalImageHash": "29537db361a05fb3246113f7ecf482df8c89499f394a6fdfe99b521f165c565e",
+      "frameHash": "56246531c3449e2c0671890a4563acde2d85fe60229d39cdca5de3b2956431b3"
+    }
+  ],
+  "framesDigest": "5243ab4c64fed599a4ce43de6069965d95ea8c5934001b966c2a64c8663c7fcc",
+  "preimage": "01001370782d73657175656e63652d73756d6d6172790020c178516da57a53de38ace67d8a4ce68fcd2c5d1d3d298ac7baf4138404c01dfb0100000000000000010000000000000000000000000001000000015243ab4c64fed599a4ce43de6069965d95ea8c5934001b966c2a64c8663c7fcc"
+}

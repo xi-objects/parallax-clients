@@ -1,0 +1,26 @@
+{
+  "description": "The connected chain fixture committed with an expected size: its real BODY frame hashes and sequence hash, stand-in image hashes, reach 30 (END's id).",
+  "sequenceHash": "00c309cf2de27b92c5915bbece0135c4749b60f499ac6c4aeff076c568bfb977",
+  "expectedSize": 2,
+  "finalSize": 2,
+  "verdict": {
+    "connected": true,
+    "sealed": true,
+    "reach": "30",
+    "framesReceived": 2
+  },
+  "frames": [
+    {
+      "frameId": "10",
+      "originalImageHash": "0737d61b102e98098f3a08d793f04c0f43a9877c6699a990f77ac27523be1297",
+      "frameHash": "a458ac34c6a834b165a58ae5ba95f0569fe571ddbd18a9c0df8d9fd5323bac99"
+    },
+    {
+      "frameId": "20",
+      "originalImageHash": "4d7d430faadd8dba66a34b32ce2db4442e9668627b2141b1631910df19347119",
+      "frameHash": "1ccffa40958599a6486a806dac6b3062e83f189dfa4a3294092f477b8545f427"
+    }
+  ],
+  "framesDigest": "cfcc9c8ffa7c074d05b87beb7e19d85de76c7f07778021053b9436acb1bac1f5",
+  "preimage": "01001370782d73657175656e63652d73756d6d617279002000c309cf2de27b92c5915bbece0135c4749b60f499ac6c4aeff076c568bfb9770100000002000000020101000000000000001e0000000200000002cfcc9c8ffa7c074d05b87beb7e19d85de76c7f07778021053b9436acb1bac1f5"
+}
