@@ -10,6 +10,7 @@ public sealed partial class ParallaxClient
         OpenedSequence sequence,
         SequenceVerdictResponse verdict,
         SequenceRegisterOptions options,
+        IReadOnlyList<SequenceFrameHash> encodedHashes,
         CancellationToken cancellationToken)
     {
         if (verdict.Connected != true || verdict.Gaps is { Count: > 0 } || verdict.Errata is { Count: > 0 })
@@ -17,7 +18,7 @@ public sealed partial class ParallaxClient
             throw new SequenceVerdictException(verdict);
         }
 
-        return await CommitAndReadResultsAsync(sequence, verdict, options, cancellationToken).ConfigureAwait(false);
+        return await CommitAndReadResultsAsync(sequence, verdict, options, encodedHashes, cancellationToken).ConfigureAwait(false);
     }
 
     // PC-104: commits, calling again after the poll interval while incomplete and attempts remain, then reads results;
@@ -26,6 +27,7 @@ public sealed partial class ParallaxClient
         OpenedSequence sequence,
         SequenceVerdictResponse verdict,
         SequenceRegisterOptions options,
+        IReadOnlyList<SequenceFrameHash> encodedHashes,
         CancellationToken cancellationToken)
     {
         var commit = await CommitSequenceAsync(sequence.Handle, cancellationToken).ConfigureAwait(false);
@@ -41,6 +43,7 @@ public sealed partial class ParallaxClient
         }
 
         var results = await GetSequenceResultsAsync(sequence.Handle, cancellationToken).ConfigureAwait(false);
-        return new SequenceRegisterResult(sequence, verdict, commit, results);
+        // PC-121: with the frame hashes this call encoded
+        return new SequenceRegisterResult(sequence, verdict, commit, results, encodedHashes);
     }
 }

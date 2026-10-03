@@ -101,6 +101,10 @@ class SequenceConversationServer:
         """The part ids of every frames request, one list per request, in order."""
         return [[int(name) for name, _ in parts] for parts in self._frame_batches()]
 
+    def uploaded_frames(self) -> list[tuple[int, bytes]]:
+        """PC-121: every uploaded frame's part id and raw bytes, in upload order across requests."""
+        return [(int(name), body) for parts in self._frame_batches() for name, body in parts]
+
     def decode_uploads(self) -> list[list[DecodedSequenceFrame]]:
         """Every frames request's frames decoded back through the codec, one list per request."""
         batches: list[list[DecodedSequenceFrame]] = []

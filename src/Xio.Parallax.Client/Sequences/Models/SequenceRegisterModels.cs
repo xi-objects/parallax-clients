@@ -67,6 +67,8 @@ public sealed record SequenceRegisterOptions(TimeSpan PollInterval,
 }
 
 // PC-104: the outcome of the register conversation, led by the opened sequence; no errata, which refuse before commit
+// PC-121: and the PX frame hash of every BODY frame this call encoded, kept rather than discarded, so a registrant can
+// check the published sequence record's summary against what it actually sent
 /// <summary>
 /// The outcome of registering a sequence: the sequence it ran in, the verdict the client sealed
 /// it on, its commit and its final results. A verdict naming errata frames never reaches here; it
@@ -76,7 +78,17 @@ public sealed record SequenceRegisterOptions(TimeSpan PollInterval,
 /// <param name="Verdict">The verdict the sequence was sealed on.</param>
 /// <param name="Commit">The sequence's commit response.</param>
 /// <param name="Results">The sequence's final results.</param>
+/// <param name="EncodedFrameHashes">Every BODY frame this call encoded and uploaded, in chain order, with its PX frame hash;
+/// on a resume only the frames this run sent, and none when it found the sequence already committed.</param>
 public sealed record SequenceRegisterResult(OpenedSequence Sequence,
                                             SequenceVerdictResponse Verdict,
                                             SequenceCommitResponse Commit,
-                                            SequenceResultsResponse Results);
+                                            SequenceResultsResponse Results,
+                                            IReadOnlyList<SequenceFrameHash> EncodedFrameHashes);
+
+// PC-121: one BODY frame's id and the PX frame hash the encoder produced for it
+/// <summary>One BODY frame's id and its PX frame hash, as this client encoded it.</summary>
+/// <param name="FrameId">The frame's id.</param>
+/// <param name="FrameHash">The frame's PX frame hash: the trailer its encoded bytes end with.</param>
+public sealed record SequenceFrameHash(long FrameId,
+                                       ReadOnlyMemory<byte> FrameHash);

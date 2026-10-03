@@ -30,6 +30,7 @@ from .linker import link_frames, link_frames_async
 from .models import (
     OpenedSequence,
     SequenceBatching,
+    SequenceFrameHash,
     SequenceRegisterOptions,
     SequenceRegisterResult,
     VerdictCallback,
@@ -62,12 +63,14 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
         """
         _refuse_unless_exactly_one_of_open_and_existing(options)
 
+        # PC-121: every BODY frame this call encodes, collected as it goes, for the result
+        hashes: list[SequenceFrameHash] = []
         if options.open is not None:
             opened = await self.open_sequence(options.open)
-            verdict = await self._seal_sequence(opened, source, options.batching, _select_every_frame, on_verdict)
-            return await self._commit_verdict(opened, verdict, options)
+            verdict = await self._seal_sequence(opened, source, options.batching, _select_every_frame, on_verdict, hashes)
+            return await self._commit_verdict(opened, verdict, options, hashes)
 
-        return await self._resume_sequence(options.existing, source, options, on_verdict)
+        return await self._resume_sequence(options.existing, source, options, on_verdict, hashes)
 
     # PC-114: branches a resume on the sequence's own state, as its progress answers it
     async def _resume_sequence(
@@ -76,6 +79,7 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
         source: AnySequenceFrameSource,
         options: SequenceRegisterOptions,
         on_verdict: VerdictCallback | None,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceRegisterResult:
         """Async mirror of `SequenceConversation._resume_sequence`."""
         current = await self.get_sequence_progress(existing.handle)
@@ -83,13 +87,13 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
             on_verdict(current)
 
         if current.state == STATE_OPEN:
-            return await self._resume_open_sequence(existing, current, source, options, on_verdict)
+            return await self._resume_open_sequence(existing, current, source, options, on_verdict, hashes)
 
         if current.state == STATE_SEALED:
-            return await self._resume_sealed_sequence(existing, source, options, on_verdict)
+            return await self._resume_sealed_sequence(existing, source, options, on_verdict, hashes)
 
         if current.state == STATE_COMMITTED:
-            return await self._commit_and_read_results(existing, current, options)
+            return await self._commit_and_read_results(existing, current, options, hashes)
 
         raise ParallaxClientError(f"a sequence in state {current.state!r} cannot be resumed")
 
@@ -101,6 +105,7 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
         source: AnySequenceFrameSource,
         options: SequenceRegisterOptions,
         on_verdict: VerdictCallback | None,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceRegisterResult:
         """Async mirror of `SequenceConversation._resume_open_sequence`."""
         if current.reach is None:
@@ -111,8 +116,8 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
         def selects(frame_id: int) -> bool:
             return is_selected_for_resume(frame_id, reach, gaps)
 
-        verdict = await self._seal_sequence(existing, source, options.batching, selects, on_verdict)
-        return await self._commit_verdict(existing, verdict, options)
+        verdict = await self._seal_sequence(existing, source, options.batching, selects, on_verdict, hashes)
+        return await self._commit_verdict(existing, verdict, options, hashes)
 
     # PC-114: a sealed sequence gets only its gap fills, and no END
     async def _resume_sealed_sequence(
@@ -121,6 +126,7 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
         source: AnySequenceFrameSource,
         options: SequenceRegisterOptions,
         on_verdict: VerdictCallback | None,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceRegisterResult:
         """Async mirror of `SequenceConversation._resume_sealed_sequence`."""
         gaps = _gap_ranges(await self.get_sequence_gaps(existing.handle))
@@ -128,11 +134,11 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
         def selects(frame_id: int) -> bool:
             return any(gap.range_from <= frame_id <= gap.range_to for gap in gaps)
 
-        await self._upload_source_frames(existing, source, options.batching, selects)
+        await self._upload_source_frames(existing, source, options.batching, selects, hashes)
         verdict = await self.get_sequence_progress(existing.handle)
         if on_verdict is not None:
             on_verdict(verdict)
-        return await self._commit_verdict(existing, verdict, options)
+        return await self._commit_verdict(existing, verdict, options, hashes)
 
     # PC-114: uploads the selected frames, then END as its own batch, and takes the verdict it answered
     async def _seal_sequence(
@@ -142,9 +148,10 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
         batching: SequenceBatching,
         selects: _Selects,
         on_verdict: VerdictCallback | None,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceVerdictResponse:
         """Async mirror of `SequenceConversation._seal_sequence`."""
-        tail = await self._upload_source_frames(sequence, source, batching, selects)
+        tail = await self._upload_source_frames(sequence, source, batching, selects, hashes)
         if tail is None:
             raise ParallaxClientError(
                 "a sequence needs at least one BODY; the source yielded no frame, and the sequence is left open"
@@ -168,6 +175,7 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
         source: AnySequenceFrameSource,
         batching: SequenceBatching,
         selects: _Selects,
+        hashes: list[SequenceFrameHash],
     ) -> _SourceTail | None:
         """Read the whole source, an async source preferred when `source` satisfies both protocols;
         see `SequenceConversation._upload_source_frames`."""
@@ -182,6 +190,8 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
                 if selects(linked.frame.frame_id):
                     encoded = encoder.encode_body(sequence.handle.sequence_id, linked.frame, linked.prev, linked.next)
                     batch = planner.add(encoded)
+                    # PC-121: kept for the result, in chain order, once the frame is in a batch that will be sent
+                    hashes.append(SequenceFrameHash(encoded.frame_id, encoded.frame_hash))
                     if batch is not None:
                         await self.upload_sequence_frames(sequence.handle, batch)
         else:
@@ -190,6 +200,8 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
                 if selects(linked.frame.frame_id):
                     encoded = encoder.encode_body(sequence.handle.sequence_id, linked.frame, linked.prev, linked.next)
                     batch = planner.add(encoded)
+                    # PC-121: kept for the result, in chain order, once the frame is in a batch that will be sent
+                    hashes.append(SequenceFrameHash(encoded.frame_id, encoded.frame_hash))
                     if batch is not None:
                         await self.upload_sequence_frames(sequence.handle, batch)
 
@@ -200,16 +212,24 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
 
     # PC-114: refuses a verdict that is not connected or still names a gap or an errata frame, then commits
     async def _commit_verdict(
-        self, sequence: OpenedSequence, verdict: SequenceVerdictResponse, options: SequenceRegisterOptions
+        self,
+        sequence: OpenedSequence,
+        verdict: SequenceVerdictResponse,
+        options: SequenceRegisterOptions,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceRegisterResult:
         """Async mirror of `SequenceConversation._commit_verdict`."""
         if not is_committable(verdict.connected, len(verdict.gaps), len(verdict.errata)):
             raise SequenceVerdictError(verdict)
-        return await self._commit_and_read_results(sequence, verdict, options)
+        return await self._commit_and_read_results(sequence, verdict, options, hashes)
 
     # PC-114: commits, retrying after the poll interval while incomplete and attempts remain, then reads results
     async def _commit_and_read_results(
-        self, sequence: OpenedSequence, verdict: SequenceVerdictResponse, options: SequenceRegisterOptions
+        self,
+        sequence: OpenedSequence,
+        verdict: SequenceVerdictResponse,
+        options: SequenceRegisterOptions,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceRegisterResult:
         """Async mirror of `SequenceConversation._commit_and_read_results`."""
         commit: SequenceCommitResponse = await self.commit_sequence(sequence.handle)
@@ -222,4 +242,5 @@ class AsyncSequenceConversation(AsyncSequenceRoutes):
             attempt += 1
 
         results = await self.get_sequence_results(sequence.handle)
-        return SequenceRegisterResult(sequence, verdict, commit, results)
+        # PC-121: with the frame hashes this call encoded
+        return SequenceRegisterResult(sequence, verdict, commit, results, tuple(hashes))

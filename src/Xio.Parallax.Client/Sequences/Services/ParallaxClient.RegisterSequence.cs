@@ -43,14 +43,16 @@ public sealed partial class ParallaxClient
                 nameof(options));
         }
 
+        // PC-121: every BODY frame this call encodes, collected as it goes, for the result
+        var encodedHashes = new List<SequenceFrameHash>();
         if (options.Open is { } openRequest)
         {
             var opened = await OpenSequenceAsync(openRequest, cancellationToken).ConfigureAwait(false);
-            var verdict = await SealSequenceAsync(opened, source, options.Batching, static _ => true, progress, cancellationToken).ConfigureAwait(false);
-            return await CommitVerdictAsync(opened, verdict, options, cancellationToken).ConfigureAwait(false);
+            var verdict = await SealSequenceAsync(opened, source, options.Batching, static _ => true, encodedHashes, progress, cancellationToken).ConfigureAwait(false);
+            return await CommitVerdictAsync(opened, verdict, options, encodedHashes, cancellationToken).ConfigureAwait(false);
         }
 
-        return await ResumeSequenceAsync(options.Existing!, source, options, progress, cancellationToken).ConfigureAwait(false);
+        return await ResumeSequenceAsync(options.Existing!, source, options, encodedHashes, progress, cancellationToken).ConfigureAwait(false);
     }
 
     // PC-104: branches a resume on the sequence's own state, as its progress answers it
@@ -58,6 +60,7 @@ public sealed partial class ParallaxClient
         OpenedSequence existing,
         ISequenceFrameSource source,
         SequenceRegisterOptions options,
+        List<SequenceFrameHash> encodedHashes,
         IProgress<SequenceVerdictResponse>? progress,
         CancellationToken cancellationToken)
     {
@@ -75,22 +78,23 @@ public sealed partial class ParallaxClient
                         source,
                         options.Batching,
                         frameId => frameId > reach || LiesInGap(frameId, gaps),
+                        encodedHashes,
                         progress,
                         cancellationToken).ConfigureAwait(false);
-                    return await CommitVerdictAsync(existing, verdict, options, cancellationToken).ConfigureAwait(false);
+                    return await CommitVerdictAsync(existing, verdict, options, encodedHashes, cancellationToken).ConfigureAwait(false);
                 }
 
             case SequenceWire.Sealed:
                 {
                     var gaps = await ReadGapRangesAsync(existing.Handle, cancellationToken).ConfigureAwait(false);
-                    await UploadSourceFramesAsync(existing, source, options.Batching, frameId => LiesInGap(frameId, gaps), cancellationToken).ConfigureAwait(false);
+                    await UploadSourceFramesAsync(existing, source, options.Batching, frameId => LiesInGap(frameId, gaps), encodedHashes, cancellationToken).ConfigureAwait(false);
                     var verdict = await GetSequenceProgressAsync(existing.Handle, cancellationToken).ConfigureAwait(false);
                     progress?.Report(verdict);
-                    return await CommitVerdictAsync(existing, verdict, options, cancellationToken).ConfigureAwait(false);
+                    return await CommitVerdictAsync(existing, verdict, options, encodedHashes, cancellationToken).ConfigureAwait(false);
                 }
 
             case SequenceWire.Committed:
-                return await CommitAndReadResultsAsync(existing, current, options, cancellationToken).ConfigureAwait(false);
+                return await CommitAndReadResultsAsync(existing, current, options, encodedHashes, cancellationToken).ConfigureAwait(false);
 
             default:
                 throw new InvalidOperationException($"a sequence in state '{current.State}' cannot be resumed.");

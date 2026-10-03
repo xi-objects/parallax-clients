@@ -114,13 +114,27 @@ class SequenceRegisterOptions:
 
 
 @dataclass(frozen=True, slots=True)
+class SequenceFrameHash:
+    """PC-121: one BODY frame's id and the PX frame hash this client encoded for it."""
+
+    frame_id: int
+    frame_hash: bytes
+
+
+@dataclass(frozen=True, slots=True)
 class SequenceRegisterResult:
-    """The outcome of `register_sequence`: the sequence it ran in, its verdict, commit and results."""
+    """The outcome of `register_sequence`: the sequence it ran in, its verdict, commit and results.
+
+    PC-121: and `encoded_frame_hashes`, every BODY frame this call encoded and uploaded, in chain order, with
+    its PX frame hash - on a resume only the frames this run sent, none when the sequence was already
+    committed - so a registrant can check the published sequence record's summary against what it sent.
+    """
 
     sequence: OpenedSequence
     verdict: SequenceVerdictResponse
     commit: SequenceCommitResponse
     results: SequenceResultsResponse
+    encoded_frame_hashes: tuple[SequenceFrameHash, ...]
 
 
 @dataclass(frozen=True, slots=True)

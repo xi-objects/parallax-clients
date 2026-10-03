@@ -74,6 +74,12 @@ internal sealed class SequenceConversationServer
     internal IReadOnlyList<IReadOnlyList<long>> UploadedFrameIds()
         => FramesRequests().Select(parts => (IReadOnlyList<long>)parts.Select(part => long.Parse(part.Name, CultureInfo.InvariantCulture)).ToList()).ToList();
 
+    // PC-121: every frame part's id and raw bytes, in upload order across requests - what a hash kept on the register
+    // result is checked against, never a value the test invents
+    /// <summary>Every uploaded frame's part id and raw bytes, in upload order.</summary>
+    internal IReadOnlyList<(long FrameId, byte[] Bytes)> UploadedFrames()
+        => FramesRequests().SelectMany(parts => parts).Select(part => (long.Parse(part.Name, CultureInfo.InvariantCulture), part.Body.ToArray())).ToList();
+
     // PC-104: decodes through the shared Common provider
     /// <summary>Every frames request's frames decoded back through Common, one list per request.</summary>
     internal async Task<IReadOnlyList<IReadOnlyList<DecodedSequenceFrame>>> DecodeUploadsAsync()

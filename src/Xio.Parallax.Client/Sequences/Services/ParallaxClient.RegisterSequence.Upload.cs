@@ -11,10 +11,11 @@ public sealed partial class ParallaxClient
         ISequenceFrameSource source,
         SequenceBatching batching,
         Func<long, bool> selects,
+        List<SequenceFrameHash> encodedHashes,
         IProgress<SequenceVerdictResponse>? progress,
         CancellationToken cancellationToken)
     {
-        var tail = await UploadSourceFramesAsync(sequence, source, batching, selects, cancellationToken).ConfigureAwait(false)
+        var tail = await UploadSourceFramesAsync(sequence, source, batching, selects, encodedHashes, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("a sequence needs at least one BODY; the source yielded no frame, and the sequence is left open.");
 
         var sequenceId = sequence.Handle.SequenceId;
@@ -44,6 +45,7 @@ public sealed partial class ParallaxClient
         ISequenceFrameSource source,
         SequenceBatching batching,
         Func<long, bool> selects,
+        List<SequenceFrameHash> encodedHashes,
         CancellationToken cancellationToken)
     {
         var sequenceId = sequence.Handle.SequenceId;
@@ -77,6 +79,9 @@ public sealed partial class ParallaxClient
 
             batchBytes = batch.Count == 0 ? alone : batchBytes + appended;
             batch.Add(encoded);
+
+            // PC-121: kept for the result, in chain order, once the frame is in a batch that will be sent
+            encodedHashes.Add(new SequenceFrameHash(encoded.FrameId, encoded.FrameHash));
         }
 
         if (batch.Count > 0)

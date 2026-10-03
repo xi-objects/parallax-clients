@@ -24,6 +24,7 @@ from .linker import link_frames
 from .models import (
     OpenedSequence,
     SequenceBatching,
+    SequenceFrameHash,
     SequenceRegisterOptions,
     SequenceRegisterResult,
     VerdictCallback,
@@ -89,12 +90,14 @@ class SequenceConversation(SequenceRoutes):
         """
         _refuse_unless_exactly_one_of_open_and_existing(options)
 
+        # PC-121: every BODY frame this call encodes, collected as it goes, for the result
+        hashes: list[SequenceFrameHash] = []
         if options.open is not None:
             opened = self.open_sequence(options.open)
-            verdict = self._seal_sequence(opened, source, options.batching, _select_every_frame, on_verdict)
-            return self._commit_verdict(opened, verdict, options)
+            verdict = self._seal_sequence(opened, source, options.batching, _select_every_frame, on_verdict, hashes)
+            return self._commit_verdict(opened, verdict, options, hashes)
 
-        return self._resume_sequence(options.existing, source, options, on_verdict)
+        return self._resume_sequence(options.existing, source, options, on_verdict, hashes)
 
     # PC-114: branches a resume on the sequence's own state, as its progress answers it
     def _resume_sequence(
@@ -103,6 +106,7 @@ class SequenceConversation(SequenceRoutes):
         source: SequenceFrameSource,
         options: SequenceRegisterOptions,
         on_verdict: VerdictCallback | None,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceRegisterResult:
         """Resume `existing`: an open sequence gets its missing frames then END, a sealed one only
         its gap fills, a committed one only its commit again; any other state refuses, naming it."""
@@ -111,13 +115,13 @@ class SequenceConversation(SequenceRoutes):
             on_verdict(current)
 
         if current.state == STATE_OPEN:
-            return self._resume_open_sequence(existing, current, source, options, on_verdict)
+            return self._resume_open_sequence(existing, current, source, options, on_verdict, hashes)
 
         if current.state == STATE_SEALED:
-            return self._resume_sealed_sequence(existing, source, options, on_verdict)
+            return self._resume_sealed_sequence(existing, source, options, on_verdict, hashes)
 
         if current.state == STATE_COMMITTED:
-            return self._commit_and_read_results(existing, current, options)
+            return self._commit_and_read_results(existing, current, options, hashes)
 
         raise ParallaxClientError(f"a sequence in state {current.state!r} cannot be resumed")
 
@@ -129,6 +133,7 @@ class SequenceConversation(SequenceRoutes):
         source: SequenceFrameSource,
         options: SequenceRegisterOptions,
         on_verdict: VerdictCallback | None,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceRegisterResult:
         """Resume an `open` sequence: reach and gaps select which frames re-send, then END."""
         if current.reach is None:
@@ -139,8 +144,8 @@ class SequenceConversation(SequenceRoutes):
         def selects(frame_id: int) -> bool:
             return is_selected_for_resume(frame_id, reach, gaps)
 
-        verdict = self._seal_sequence(existing, source, options.batching, selects, on_verdict)
-        return self._commit_verdict(existing, verdict, options)
+        verdict = self._seal_sequence(existing, source, options.batching, selects, on_verdict, hashes)
+        return self._commit_verdict(existing, verdict, options, hashes)
 
     # PC-114: a sealed sequence gets only its gap fills, and no END
     def _resume_sealed_sequence(
@@ -149,6 +154,7 @@ class SequenceConversation(SequenceRoutes):
         source: SequenceFrameSource,
         options: SequenceRegisterOptions,
         on_verdict: VerdictCallback | None,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceRegisterResult:
         """Resume a `sealed` sequence: only the gap fills are sent, and its progress is re-read."""
         gaps = _gap_ranges(self.get_sequence_gaps(existing.handle))
@@ -156,11 +162,11 @@ class SequenceConversation(SequenceRoutes):
         def selects(frame_id: int) -> bool:
             return any(gap.range_from <= frame_id <= gap.range_to for gap in gaps)
 
-        self._upload_source_frames(existing, source, options.batching, selects)
+        self._upload_source_frames(existing, source, options.batching, selects, hashes)
         verdict = self.get_sequence_progress(existing.handle)
         if on_verdict is not None:
             on_verdict(verdict)
-        return self._commit_verdict(existing, verdict, options)
+        return self._commit_verdict(existing, verdict, options, hashes)
 
     # PC-114: uploads the selected frames, then END as its own batch, and takes the verdict it answered
     def _seal_sequence(
@@ -170,9 +176,10 @@ class SequenceConversation(SequenceRoutes):
         batching: SequenceBatching,
         selects: _Selects,
         on_verdict: VerdictCallback | None,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceVerdictResponse:
         """Upload every frame `selects` keeps, seal with END, and return the verdict it answered."""
-        tail = self._upload_source_frames(sequence, source, batching, selects)
+        tail = self._upload_source_frames(sequence, source, batching, selects, hashes)
         if tail is None:
             raise ParallaxClientError(
                 "a sequence needs at least one BODY; the source yielded no frame, and the sequence is left open"
@@ -196,6 +203,7 @@ class SequenceConversation(SequenceRoutes):
         source: SequenceFrameSource,
         batching: SequenceBatching,
         selects: _Selects,
+        hashes: list[SequenceFrameHash],
     ) -> _SourceTail | None:
         """Read the whole source, linked from the sequence's HEAD id; upload every frame `selects`
         keeps, batched under `batching`; return the last frame's id and its derived END id, or
@@ -209,6 +217,8 @@ class SequenceConversation(SequenceRoutes):
                 continue
             encoded = encoder.encode_body(sequence.handle.sequence_id, linked.frame, linked.prev, linked.next)
             batch = planner.add(encoded)
+            # PC-121: kept for the result, in chain order, once the frame is in a batch that will be sent
+            hashes.append(SequenceFrameHash(encoded.frame_id, encoded.frame_hash))
             if batch is not None:
                 self.upload_sequence_frames(sequence.handle, batch)
 
@@ -219,16 +229,24 @@ class SequenceConversation(SequenceRoutes):
 
     # PC-114: refuses a verdict that is not connected or still names a gap or an errata frame, then commits
     def _commit_verdict(
-        self, sequence: OpenedSequence, verdict: SequenceVerdictResponse, options: SequenceRegisterOptions
+        self,
+        sequence: OpenedSequence,
+        verdict: SequenceVerdictResponse,
+        options: SequenceRegisterOptions,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceRegisterResult:
         """Raise `SequenceVerdictError` unless `verdict` is committable; otherwise commit and read results."""
         if not is_committable(verdict.connected, len(verdict.gaps), len(verdict.errata)):
             raise SequenceVerdictError(verdict)
-        return self._commit_and_read_results(sequence, verdict, options)
+        return self._commit_and_read_results(sequence, verdict, options, hashes)
 
     # PC-114: commits, retrying after the poll interval while incomplete and attempts remain, then reads results
     def _commit_and_read_results(
-        self, sequence: OpenedSequence, verdict: SequenceVerdictResponse, options: SequenceRegisterOptions
+        self,
+        sequence: OpenedSequence,
+        verdict: SequenceVerdictResponse,
+        options: SequenceRegisterOptions,
+        hashes: list[SequenceFrameHash],
     ) -> SequenceRegisterResult:
         """Commit `sequence`, calling again after `options.poll_interval` while the outcome is
         `incomplete` and attempts remain, then read its results."""
@@ -242,4 +260,5 @@ class SequenceConversation(SequenceRoutes):
             attempt += 1
 
         results = self.get_sequence_results(sequence.handle)
-        return SequenceRegisterResult(sequence, verdict, commit, results)
+        # PC-121: with the frame hashes this call encoded
+        return SequenceRegisterResult(sequence, verdict, commit, results, tuple(hashes))
