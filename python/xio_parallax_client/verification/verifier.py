@@ -15,6 +15,7 @@ from .chain import chain_checks
 from .errors import VerificationRefused
 from .preimage import CANONICAL_VERSION, LEGACY_CANONICAL_VERSION, CanonicalPreimage
 from .report import CheckOutcome, VerificationCheck, VerificationReport
+from .sequence import record_sequence, sequence_checks
 from .trust_roots import TrustRoots
 
 _HASH_ALGORITHM = "BLAKE3-256"
@@ -73,7 +74,7 @@ class AttributionVerifier:
 
         Raises `VerificationRefused` for a hash or signature algorithm other than BLAKE3-256 / Ed25519, a
         canonical version other than 0 (legacy) or 2, a malformed content hash, a record without a
-        verification block, or no trust roots.
+        verification block, no trust roots, or a sequence record's summary preimage version other than 1.
         """
         if not self._roots.certificates:
             raise VerificationRefused("Control not activated: no roots")
@@ -101,6 +102,12 @@ class AttributionVerifier:
         ok, detail = _ed25519_verify(key, v.signature, content_hash)
         checks.append(VerificationCheck("imageSignature", _PASSED if ok else _FAILED, detail))
         checks.extend(chain_checks(self._roots, v, key_raw))
+
+        # PC-120: a sequence record also proves its frame list - the sequence hash over the listed frame
+        # hashes, and the summary signature binding each one's frame id and image
+        sequence = record_sequence(record)
+        if sequence is not None:
+            checks.extend(sequence_checks(sequence, content_hash, key))
         return report
 
     @staticmethod
