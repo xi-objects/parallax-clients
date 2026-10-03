@@ -68,6 +68,26 @@ print(report.all_performed_passed)
 `report` carries one verdict per check (`passed`, `failed`, `not_recomputable` or `not_performed`),
 never a bare boolean; a JSON-form manifest's hash is always `not_recomputable`.
 
+A record is keyed by `originalImageHash`, the BLAKE3-256 of the image's bytes. That is not the
+`imageHash` a registration slot reports for an upload, which is the SHA-256 of the same bytes and
+keys only the slot's own entry.
+
+### A sequence record
+
+A sequence's record (read by its sequence hash, the way an image's record is read by its hash)
+answers `sequence`: its sizes, the verdict it was committed under, and every frame in walk order.
+The same `Verify` call adds two checks for it:
+
+- `sequenceHash`: the BLAKE3-256 of the listed frame hashes, in the order listed, equals the
+  record's signed `contentHash`. This proves the ordered frame hashes.
+- `summarySignature`: the record's Ed25519 signature over the whole summary verifies under its
+  `publicKey`. This proves which frame id and which image each frame hash stands for, and the sizes
+  and verdict. A sequence committed before summary signing reports it `not_performed` (each
+  frame's position is reported, not proven), never `failed`.
+
+A frame's own record answers `membership` (its sequence hash, frame id and frame hash): treat it as
+the pointer to the sequence record, whose signed summary is the answer.
+
 ## Registering a sequence
 
 A sequence registers a video frame by frame rather than as one upload. It needs the calling
@@ -97,7 +117,9 @@ except SequencesNotEnabled:
 ```
 
 A run that is interrupted resumes by calling the same method again with `options.Existing` /
-`options.existing` set to the `OpenedSequence` a prior run answered. See the client READMEs for
+`options.existing` set to the `OpenedSequence` a prior run answered. The result's
+`EncodedFrameHashes` / `encoded_frame_hashes` lists the PX frame hash of every BODY frame that call
+sent, in chain order, so you can check the published sequence record's summary against it. See the client READMEs for
 the frame source contract, batching and the resulting refusal/exception types.
 
 ## Examples and their inputs
@@ -123,4 +145,7 @@ uv sync --frozen && uv run pytest
 
 ## License
 
-MIT.
+MIT; see [LICENSE](LICENSE). Everything in this repository is public, and nothing in it is
+proprietary to XI Objects. The PX Frame test vectors under `python/tests/vectors/px-frame` are
+XI Objects' own test material, redistributed unmodified and not under this licence (see their
+`VECTORS.md`).

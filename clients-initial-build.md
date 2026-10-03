@@ -685,3 +685,47 @@ reimplementation from the format's own documentation is for the owner to confirm
 `VECTORS.md` states the vectors' status as XI Objects' own material redistributed unmodified, and
 this repository's MIT license does not extend to them.
 
+## PX Motion: the sequence record proven (2026-10-03)
+
+PX Motion is video and film on Parallax (`xio_parallax_rest`'s `px-motion-initial-build.md`, decisions
+PM1..PM14). This repository's part is what any integrator needs to read and **prove** a sequence
+record, and nothing more.
+
+### the rule this repository keeps (PM14, Isaac, 2026-10-02)
+
+Anything in this repository is public, so nothing proprietary goes in it. Parallax Motion's own
+know-how (anchor picking, fingerprints, the vote and alignment, every threshold) runs in a private
+client that XI Objects hosts behind its own SaaS facade and never ships. This repository carries
+only what is common knowledge or must be public for trust: the API models, the frame container and
+the signature and hash checks.
+
+### what changed
+
+- **PC-118: the contract.** `openapi/v1.json` is REST feature/px-motion's live document (the green
+  e2e gate of 2026-10-02, REST `dc515b8`), keeping the production `servers` entry, which the e2e leg
+  has none of. Both clients regenerate: the published-record response gains `membership` and
+  `sequence`, the latter carrying `summaryPreimageVersion` and `summarySignature`.
+- **PC-119 / PC-120: the sequence-record verifier, .NET and Python.** `Verify` adds `sequenceHash`
+  and `summarySignature` checks for a sequence record. The version-1 summary preimage (115 bytes,
+  `xio_parallax_common`'s `px-frame.md`) is laid out here, as the manifest preimages already are,
+  and proven against Common's own `vectors/sequence-summary` and `vectors/sequence-hash`, which
+  `scripts/vendor-px-vectors.sh` now vendors too. A sequence committed before summary signing reports
+  `summarySignature` not performed (frame positions reported, not proven), never failed.
+- **PC-121: frame hashes kept.** The register result carries every BODY frame's PX frame hash the
+  call encoded, in chain order, instead of dropping it.
+- **PC-122: docs, licence and version.** The READMEs describe the sequence checks and the frame
+  hashes; an MIT `LICENSE` file joins the README's long-standing "MIT"; .NET 0.5.0, Python 0.4.0.
+
+### two hashes, two jobs
+
+A registration slot keys an upload by `imageHash`, the SHA-256 of its bytes, computed by REST. A
+published record is keyed by `originalImageHash`, the BLAKE3-256 of the same bytes, which is what a
+look-up answers and what a sequence's frame list carries (REST XI-317's e2e proves commit keys
+every frame that way). The client docstrings that say SHA-256 are about the first, and are right.
+
+### what stays open
+
+- The vendored vectors are pinned to Common `8978c30`, a commit on Common's unmerged
+  `feature/px-motion`; re-vendor from the merged commit before this branch lands.
+- The pinned document is REST feature/px-motion's; re-pin from the live API once REST is merged and
+  deployed.

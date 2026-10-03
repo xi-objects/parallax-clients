@@ -93,7 +93,9 @@ required), seal with END, commit (retrying an `incomplete` outcome up to
 `on_verdict` is called with every verdict read along the way. Resuming (`options.existing` set
 instead of `options.open`) sends only what is missing: an open sequence gets frames past its reach
 or inside a gap, then END; a sealed one only its gap fills; a committed one only its commit
-retried.
+retried. The result's `encoded_frame_hashes` lists every BODY frame that call sent, in chain
+order, with its PX frame hash (`SequenceFrameHash`), so the published sequence record's summary can
+be checked against it.
 
 Exactly one of `SequenceRegisterOptions.open`/`existing` must be set (else `ValueError`).
 
@@ -142,6 +144,10 @@ roots, returning a `VerificationReport` (`xio_parallax_client.verification`) of 
 - `originalImageHash`, `contentHash` (needs `original_image_bytes`; `NOT_PERFORMED` without it)
 - `manifestHash:<kind>`, `manifestSignature:<kind>` — one pair per manifest
 - `collectionSignature`, `imageSignature`, `leafKeyMatchesPublicKey`, `certificateChain`
+- on a sequence record only: `sequenceHash` (BLAKE3-256 over the listed frame hashes, in order,
+  against `contentHash`) and `summarySignature` (Ed25519 under `publicKey` over the version-1
+  summary preimage, which `SequenceSummaryPreimage` lays out). The second is `NOT_PERFORMED` on a
+  sequence committed before summary signing, whose frame positions are reported, not proven.
 
 `CheckOutcome` is `PASSED`, `FAILED`, `NOT_RECOMPUTABLE` (a JSON-form manifest's hash: its stored
 bytes are the carrier's own JUMBF, which the record does not return — never reported `PASSED`) or
@@ -155,8 +161,8 @@ image signature, leaf key and certificate chain checks are unaffected.
 
 `AttributionVerifier(...)` and `.verify(...)` raise `VerificationRefused` for: no trust roots; a
 record with no verification block; a canonical version other than 0 or 2; a hash algorithm other
-than BLAKE3-256; a signature algorithm other than Ed25519; or a content hash that is not a 32-byte
-hex digest.
+than BLAKE3-256; a signature algorithm other than Ed25519; a content hash that is not a 32-byte
+hex digest; or a sequence record's `summaryPreimageVersion` other than 1.
 
 `TrustRoots` (never empty; `xio_parallax_client.verification`):
 
