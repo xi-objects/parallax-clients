@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "Xio.Parallax.Rest",
-    "version": "1.0.0+29a207ab3ba943bcc93558efc364b4ce7eb24f3c"
+    "version": "1.0.0+dc515b8b654441011af5eafa721bffd27560c71b"
   },
   "servers": [
     {
@@ -4028,6 +4028,30 @@
           }
         }
       },
+      "PublishedFrameMembership": {
+        "required": [
+          "sequenceHash",
+          "frameId",
+          "frameHash"
+        ],
+        "type": "object",
+        "properties": {
+          "sequenceHash": {
+            "type": "string"
+          },
+          "frameId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "frameHash": {
+            "type": "string"
+          }
+        }
+      },
       "PublishedRecordOutcome": {
         "enum": [
           "published",
@@ -4113,6 +4137,26 @@
             "type": [
               "null",
               "string"
+            ]
+          },
+          "membership": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PublishedFrameMembership"
+              }
+            ]
+          },
+          "sequence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PublishedSequence"
+              }
             ]
           }
         }
@@ -4221,6 +4265,115 @@
             "items": {
               "$ref": "#/components/schemas/PublishedRecordResponse"
             }
+          }
+        }
+      },
+      "PublishedSequence": {
+        "required": [
+          "expectedSize",
+          "finalSize",
+          "verdict",
+          "frames"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "finalSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/PublishedSequenceVerdict"
+          },
+          "frames": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublishedSequenceFrame"
+            }
+          },
+          "summaryPreimageVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "summarySignature": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "PublishedSequenceFrame": {
+        "required": [
+          "frameId",
+          "originalImageHash",
+          "frameHash"
+        ],
+        "type": "object",
+        "properties": {
+          "frameId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "originalImageHash": {
+            "type": "string"
+          },
+          "frameHash": {
+            "type": "string"
+          }
+        }
+      },
+      "PublishedSequenceVerdict": {
+        "required": [
+          "connected",
+          "sealed",
+          "reach",
+          "framesReceived"
+        ],
+        "type": "object",
+        "properties": {
+          "connected": {
+            "type": "boolean"
+          },
+          "sealed": {
+            "type": "boolean"
+          },
+          "reach": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "framesReceived": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },

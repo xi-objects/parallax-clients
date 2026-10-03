@@ -30,6 +30,14 @@ namespace Xio.Parallax.Client.Generated.Models
 #else
         public List<global::Xio.Parallax.Client.Generated.Models.PublishedRecordResponse_manifests> Manifests { get; set; }
 #endif
+        /// <summary>The membership property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::Xio.Parallax.Client.Generated.Models.PublishedFrameMembership? Membership { get; set; }
+#nullable restore
+#else
+        public global::Xio.Parallax.Client.Generated.Models.PublishedFrameMembership Membership { get; set; }
+#endif
         /// <summary>The originalImageHash property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -40,6 +48,14 @@ namespace Xio.Parallax.Client.Generated.Models
 #endif
         /// <summary>The outcome property</summary>
         public global::Xio.Parallax.Client.Generated.Models.PublishedRecordOutcome? Outcome { get; set; }
+        /// <summary>The sequence property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::Xio.Parallax.Client.Generated.Models.PublishedSequence? Sequence { get; set; }
+#nullable restore
+#else
+        public global::Xio.Parallax.Client.Generated.Models.PublishedSequence Sequence { get; set; }
+#endif
         /// <summary>The verification property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -75,8 +91,10 @@ namespace Xio.Parallax.Client.Generated.Models
             {
                 { "failureReason", n => { FailureReason = n.GetStringValue(); } },
                 { "manifests", n => { Manifests = n.GetCollectionOfObjectValues<global::Xio.Parallax.Client.Generated.Models.PublishedRecordResponse_manifests>(global::Xio.Parallax.Client.Generated.Models.PublishedRecordResponse_manifests.CreateFromDiscriminatorValue)?.AsList(); } },
+                { "membership", n => { Membership = n.GetObjectValue<global::Xio.Parallax.Client.Generated.Models.PublishedFrameMembership>(global::Xio.Parallax.Client.Generated.Models.PublishedFrameMembership.CreateFromDiscriminatorValue); } },
                 { "originalImageHash", n => { OriginalImageHash = n.GetStringValue(); } },
                 { "outcome", n => { Outcome = n.GetEnumValue<global::Xio.Parallax.Client.Generated.Models.PublishedRecordOutcome>(); } },
+                { "sequence", n => { Sequence = n.GetObjectValue<global::Xio.Parallax.Client.Generated.Models.PublishedSequence>(global::Xio.Parallax.Client.Generated.Models.PublishedSequence.CreateFromDiscriminatorValue); } },
                 { "verification", n => { Verification = n.GetObjectValue<global::Xio.Parallax.Client.Generated.Models.PublishedRecordVerification>(global::Xio.Parallax.Client.Generated.Models.PublishedRecordVerification.CreateFromDiscriminatorValue); } },
             };
         }
@@ -89,8 +107,10 @@ namespace Xio.Parallax.Client.Generated.Models
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("failureReason", FailureReason);
             writer.WriteCollectionOfObjectValues<global::Xio.Parallax.Client.Generated.Models.PublishedRecordResponse_manifests>("manifests", Manifests);
+            writer.WriteObjectValue<global::Xio.Parallax.Client.Generated.Models.PublishedFrameMembership>("membership", Membership);
             writer.WriteStringValue("originalImageHash", OriginalImageHash);
             writer.WriteEnumValue<global::Xio.Parallax.Client.Generated.Models.PublishedRecordOutcome>("outcome", Outcome);
+            writer.WriteObjectValue<global::Xio.Parallax.Client.Generated.Models.PublishedSequence>("sequence", Sequence);
             writer.WriteObjectValue<global::Xio.Parallax.Client.Generated.Models.PublishedRecordVerification>("verification", Verification);
             writer.WriteAdditionalData(AdditionalData);
         }

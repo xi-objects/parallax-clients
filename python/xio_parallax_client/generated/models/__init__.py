@@ -22,6 +22,7 @@ from .post_sequences_body import PostSequencesBody
 from .post_sequences_sequence_id_frames_body import PostSequencesSequenceIdFramesBody
 from .post_slots_slot_id_uploads_body import PostSlotsSlotIdUploadsBody
 from .problem_details import ProblemDetails
+from .published_frame_membership import PublishedFrameMembership
 from .published_record_outcome import PublishedRecordOutcome
 from .published_record_response import PublishedRecordResponse
 from .published_record_response_manifests_type_1_item import PublishedRecordResponseManifestsType1Item
@@ -29,6 +30,9 @@ from .published_record_response_manifests_type_1_item_form import PublishedRecor
 from .published_record_verification import PublishedRecordVerification
 from .published_records_request_body import PublishedRecordsRequestBody
 from .published_records_response import PublishedRecordsResponse
+from .published_sequence import PublishedSequence
+from .published_sequence_frame import PublishedSequenceFrame
+from .published_sequence_verdict import PublishedSequenceVerdict
 from .put_slots_slot_id_entries_image_hash_manifests_body import PutSlotsSlotIdEntriesImageHashManifestsBody
 from .register_single_response import RegisterSingleResponse
 from .resume_request_body import ResumeRequestBody
@@ -83,6 +87,7 @@ __all__ = (
     "PostSequencesSequenceIdFramesBody",
     "PostSlotsSlotIdUploadsBody",
     "ProblemDetails",
+    "PublishedFrameMembership",
     "PublishedRecordOutcome",
     "PublishedRecordResponse",
     "PublishedRecordResponseManifestsType1Item",
@@ -90,6 +95,9 @@ __all__ = (
     "PublishedRecordsRequestBody",
     "PublishedRecordsResponse",
     "PublishedRecordVerification",
+    "PublishedSequence",
+    "PublishedSequenceFrame",
+    "PublishedSequenceVerdict",
     "PutSlotsSlotIdEntriesImageHashManifestsBody",
     "RegisterSingleResponse",
     "ResumeRequestBody",
