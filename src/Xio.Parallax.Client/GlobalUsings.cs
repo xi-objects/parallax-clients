@@ -12,6 +12,7 @@ global using System.Runtime.CompilerServices;
 global using System.Security.Cryptography;
 global using System.Text;
 global using System.Text.Json;
+global using System.Text.RegularExpressions;
 global using System.Threading;
 global using System.Threading.Tasks;
 // PC-102: composes Xio.Parallax.Common once, in SequenceFrameEncoder
@@ -24,8 +25,6 @@ global using Microsoft.Kiota.Abstractions;
 global using Microsoft.Kiota.Abstractions.Authentication;
 global using Microsoft.Kiota.Abstractions.Serialization;
 global using Microsoft.Kiota.Http.HttpClientLibrary;
-// REST-CONTRACTS 0.1.0: JsonSerializationWriter, writing a Kiota-parsed manifest back to its wire shape
-global using Microsoft.Kiota.Serialization.Json;
 global using Org.BouncyCastle.Crypto.Parameters;
 global using Org.BouncyCastle.Crypto.Signers;
 global using Org.BouncyCastle.X509;
@@ -57,6 +56,4 @@ global using Xio.Parallax.Client.Verification.Models;
 global using Xio.Parallax.Client.Verification.Services;
 // PC-102: the PX frame types SequenceFrameEncoder and its models build on
 global using Xio.Parallax.Common;
-// REST-CONTRACTS 0.1.0: the API's own manifest wire shapes and rules
-global using Xio.Parallax.Rest.Contracts.Manifests;
 global using Blake3Hasher = Blake3.Hasher;

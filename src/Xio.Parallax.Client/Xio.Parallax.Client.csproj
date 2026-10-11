@@ -6,8 +6,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <IsPackable>true</IsPackable>
     <PackageId>Xio.Parallax.Client</PackageId>
-    <!-- REST-CONTRACTS 0.1.0: patch release, no public type removed or moved -->
-    <Version>0.4.1</Version>
+    <Version>0.4.2</Version>
     <Authors>XI Objects</Authors>
     <Company>XI Objects</Company>
     <Description>.NET client for the XI Parallax REST API: image registration, look-up, published records and attribution verification.</Description>
@@ -25,7 +24,5 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Kiota.Bundle" />
     <PackageReference Include="Xio.Parallax.Common" />
-    <!-- REST-CONTRACTS 0.1.0: the manifest part name, kind rule, media types and published manifest shape -->
-    <PackageReference Include="Xio.Parallax.Rest.Contracts" />
   </ItemGroup>
 </Project>

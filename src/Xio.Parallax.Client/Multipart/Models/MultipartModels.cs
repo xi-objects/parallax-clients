@@ -29,7 +29,7 @@ public sealed record ImageUpload(string FileName,
 /// themselves. Becomes the wire part manifest[&lt;kind&gt;].
 /// </summary>
 /// <param name="Kind">
-/// The manifest's kind, validated against <see cref="ImageManifestKinds.IsWellFormed"/> before anything is sent.
+/// The manifest's kind, validated against ^[A-Za-z0-9._-]{1,64}$ before anything is sent.
 /// </param>
 /// <param name="Form">The content type the manifest bytes are sent with.</param>
 /// <param name="Bytes">The manifest's raw bytes.</param>
@@ -37,20 +37,20 @@ public sealed record ManifestPart(string Kind,
                                    ManifestForm Form,
                                    ReadOnlyMemory<byte> Bytes)
 {
-    // REST-CONTRACTS 0.1.0: the kind, validated by the API's own rule
-    /// <summary>The manifest's kind, validated against <see cref="ImageManifestKinds.IsWellFormed"/>.</summary>
+    private static readonly Regex KindPattern = new("^[A-Za-z0-9._-]{1,64}$", RegexOptions.Compiled);
+
+    /// <summary>The manifest's kind, validated against ^[A-Za-z0-9._-]{1,64}$.</summary>
     public string Kind { get; } = ValidateKind(Kind);
 
-    // REST-CONTRACTS 0.1.0: refuses a kind ImageManifestKinds.IsWellFormed rejects, in the words of ImageManifestKinds.Rule
-    /// <summary>Returns the kind when <see cref="ImageManifestKinds.IsWellFormed"/> accepts it, else refuses it; the one check every manifest kind goes through.</summary>
+    /// <summary>Returns the kind when it matches ^[A-Za-z0-9._-]{1,64}$, else refuses it; the one check every manifest kind goes through.</summary>
     /// <param name="kind">The kind to validate.</param>
     /// <returns>The kind, unchanged.</returns>
     internal static string ValidateKind(string kind)
     {
         ArgumentNullException.ThrowIfNull(kind);
-        if (!ImageManifestKinds.IsWellFormed(kind))
+        if (!KindPattern.IsMatch(kind))
         {
-            throw new ArgumentException($"Manifest kind '{kind}' is malformed. {ImageManifestKinds.Rule}", nameof(kind));
+            throw new ArgumentException($"Manifest kind '{kind}' must match ^[A-Za-z0-9._-]{{1,64}}$.", nameof(kind));
         }
 
         return kind;
