@@ -60,18 +60,36 @@ internal sealed class ManifestChecker(IVerificationEncoding _encoding,
         };
     }
 
-    private VerificationCheck CheckJumbfHash(PublishedRecordResponse_manifests manifest, string name, byte[] manifestHash)
+    // REST-CONTRACTS 0.1.0: the stored bytes are the payload the API's PublishedManifest reads off the manifest's wire shape
+    private static VerificationCheck CheckJumbfHash(PublishedRecordResponse_manifests manifest, string name, byte[] manifestHash)
     {
-        var stored = manifest.Payload is UntypedString text ? _encoding.TryBase64(text.GetValue()) : null;
-        if (stored is null)
+        var stored = TryReadPublished(manifest)?.Manifest.Payload;
+        if (stored is not { } payload)
         {
             return new VerificationCheck(name, VerificationOutcome.Failed, "The JUMBF-form payload is not base64 text.");
         }
 
-        return Blake3Hasher.Hash(stored)
+        return Blake3Hasher.Hash(payload.Span)
                    .AsSpan()
                    .SequenceEqual(manifestHash)
             ? new VerificationCheck(name, VerificationOutcome.Passed, "BLAKE3-256 of the payload bytes equals the manifest hash.")
             : new VerificationCheck(name, VerificationOutcome.Failed, "BLAKE3-256 of the payload bytes differs from the manifest hash.");
+    }
+
+    // REST-CONTRACTS 0.1.0: re-reads the record's manifest, as Kiota parsed it, through the API's own PublishedManifest converter
+    /// <summary>The manifest as the API's <see cref="PublishedManifest"/> reads its flat wire shape; null when that shape does not read.</summary>
+    private static PublishedManifest? TryReadPublished(PublishedRecordResponse_manifests manifest)
+    {
+        using var writer = new JsonSerializationWriter();
+        writer.WriteObjectValue(null, manifest);
+        using var wire = writer.GetSerializedContent();
+        try
+        {
+            return JsonSerializer.Deserialize<PublishedManifest>(wire);
+        }
+        catch (Exception exception) when (exception is JsonException or FormatException or InvalidOperationException)
+        {
+            return null;
+        }
     }
 }
