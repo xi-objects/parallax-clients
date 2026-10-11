@@ -3,7 +3,6 @@ namespace Xio.Parallax.Client.Multipart.Services;
 /// <summary>Converts a <see cref="ManifestForm"/> to the wire content type it stands for.</summary>
 internal static class ManifestFormExtensions
 {
-    // REST-CONTRACTS 0.1.0: each form's media type is the API's own ImageManifestContentTypes constant
     /// <summary>
     /// Returns the content type this form is sent with. There is no default for an unrecognized
     /// value: it is a programming error, never a guess.
@@ -14,9 +13,9 @@ internal static class ManifestFormExtensions
     {
         return form switch
         {
-            ManifestForm.Json => ImageManifestContentTypes.JsonMediaType,
-            ManifestForm.Jumbf => ImageManifestContentTypes.JumbfMediaType,
-            ManifestForm.C2pa => ImageManifestContentTypes.C2paMediaType,
+            ManifestForm.Json => "application/json",
+            ManifestForm.Jumbf => "application/jumbf",
+            ManifestForm.C2pa => "application/c2pa",
             _ => throw new ArgumentOutOfRangeException(nameof(form), form, "Unknown manifest form; there is no default content type."),
         };
     }
