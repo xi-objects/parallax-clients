@@ -25,10 +25,9 @@ public sealed record SidecarManifest(string Name,
     /// <summary>The stated kind of a JSON sidecar; null for a JUMBF sidecar.</summary>
     public string? Kind { get; } = ValidateKind(Form, Kind);
 
-    // REST-CONTRACTS 0.1.0: the kind's rule named as the API's ImageManifestKinds
     /// <summary>A JSON sidecar of the stated kind.</summary>
     /// <param name="name">What a refusal calls it.</param>
-    /// <param name="kind">Its kind, validated against <see cref="ImageManifestKinds.IsWellFormed"/>.</param>
+    /// <param name="kind">Its kind, validated against ^[A-Za-z0-9._-]{1,64}$.</param>
     /// <param name="bytes">Its JSON bytes.</param>
     /// <returns>The sidecar.</returns>
     public static SidecarManifest Json(string name, string kind, ReadOnlyMemory<byte> bytes)
@@ -45,10 +44,9 @@ public sealed record SidecarManifest(string Name,
         return new SidecarManifest(name, ManifestForm.Jumbf, null, bytes);
     }
 
-    // REST-CONTRACTS 0.1.0: the kind's rule named as the API's ImageManifestKinds
     /// <summary>Reads a JSON sidecar from disk, named by its file name.</summary>
     /// <param name="path">The path to read.</param>
-    /// <param name="kind">Its kind, validated against <see cref="ImageManifestKinds.IsWellFormed"/>.</param>
+    /// <param name="kind">Its kind, validated against ^[A-Za-z0-9._-]{1,64}$.</param>
     /// <returns>The sidecar.</returns>
     public static SidecarManifest JsonFile(string path, string kind)
     {

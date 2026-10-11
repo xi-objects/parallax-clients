@@ -13,7 +13,6 @@ internal static class MultipartRequestContent
     private const string ExpectedSizePartName = "expectedSize";
     private const string OctetStreamContentType = "application/octet-stream";
 
-    // REST-CONTRACTS 0.1.0: each manifest part named by ImageManifestKinds.PartNameFor
     /// <summary>
     /// Builds the body for an upload that carries images and, for each image, the manifests that
     /// precede it on the wire: POST /registrations and POST /slots/{slotId}/uploads.
@@ -28,7 +27,7 @@ internal static class MultipartRequestContent
         {
             foreach (var manifest in entry.Manifests)
             {
-                content.Add(CreatePart(manifest.Bytes, manifest.Form.ToContentType()), ImageManifestKinds.PartNameFor(manifest.Kind));
+                content.Add(CreatePart(manifest.Bytes, manifest.Form.ToContentType()), $"manifest[{manifest.Kind}]");
             }
 
             content.Add(CreatePart(entry.Image.Bytes, entry.Image.ContentType), ImagePartName, entry.Image.FileName);
@@ -56,7 +55,6 @@ internal static class MultipartRequestContent
     }
 
     // PC-103: sequence open's manifest[<kind>] parts, no image, plus an optional expectedSize text part
-    // REST-CONTRACTS 0.1.0: each manifest part named by ImageManifestKinds.PartNameFor
     /// <summary>
     /// Builds the body for opening a sequence, with no image: POST /sequences. Carries every
     /// manifest as a manifest[&lt;kind&gt;] part, then, only when given, the advisory expected
@@ -71,7 +69,7 @@ internal static class MultipartRequestContent
         var content = new MultipartFormDataContent();
         foreach (var manifest in manifests)
         {
-            content.Add(CreatePart(manifest.Bytes, manifest.Form.ToContentType()), ImageManifestKinds.PartNameFor(manifest.Kind));
+            content.Add(CreatePart(manifest.Bytes, manifest.Form.ToContentType()), $"manifest[{manifest.Kind}]");
         }
 
         if (expectedSize is { } size)
