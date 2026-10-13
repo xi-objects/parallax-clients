@@ -167,9 +167,8 @@ Trust roots (`TrustRoots`, never empty):
 The client, never the API, looks inside a file.
 
 Detection, the JUMBF walk and the manifest merge come from the
-[`Xio.Parallax.Manifests`](https://www.nuget.org/packages/Xio.Parallax.Manifests) package, the
-same one the Parallax edge uses, so an image registers with the same manifest list whichever one
-sends it. `services.AddXioParallaxManifests()` registers `IEmbeddedJumbfDetector`,
+[`Xio.Parallax.Manifests`](https://www.nuget.org/packages/Xio.Parallax.Manifests) package.
+`services.AddXioParallaxManifests()` registers `IEmbeddedJumbfDetector`,
 `IJumbfStoreReader` and `IManifestMerger`; the package's README gives the carriers it reads (JPEG,
 PNG, WebP, TIFF/DNG, GIF, HEIF/HEIC/AVIF) and how each store is classified `c2pa` (sent as
 `application/c2pa`) or `jumbf` (`application/jumbf`). Any other format carries no embedded store.

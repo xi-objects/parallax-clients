@@ -9,8 +9,8 @@
     <PackageVersion Include="Microsoft.Kiota.Bundle" Version="2.1.2" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="Xio.Parallax.Common" Version="0.1.1" />
-    <!-- embedded JUMBF detection and the manifest merge, shared with the Parallax edge -->
-    <PackageVersion Include="Xio.Parallax.Manifests" Version="0.2.0" />
+    <!-- embedded JUMBF detection and the manifest merge -->
+    <PackageVersion Include="Xio.Parallax.Manifests" Version="0.2.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
