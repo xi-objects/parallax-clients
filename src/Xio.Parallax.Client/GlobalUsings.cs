@@ -56,4 +56,9 @@ global using Xio.Parallax.Client.Verification.Models;
 global using Xio.Parallax.Client.Verification.Services;
 // PC-102: the PX frame types SequenceFrameEncoder and its models build on
 global using Xio.Parallax.Common;
+// embedded JUMBF detection, the JUMBF walk and the manifest merge, from Xio.Parallax.Manifests
+global using Xio.Parallax.Manifests;
+global using Xio.Parallax.Manifests.Embedded;
+global using Xio.Parallax.Manifests.Jumbf;
+global using Xio.Parallax.Manifests.Merge;
 global using Blake3Hasher = Blake3.Hasher;

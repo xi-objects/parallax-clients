@@ -6,7 +6,7 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <IsPackable>true</IsPackable>
     <PackageId>Xio.Parallax.Client</PackageId>
-    <Version>0.4.2</Version>
+    <Version>0.5.0</Version>
     <Authors>XI Objects</Authors>
     <Company>XI Objects</Company>
     <Description>.NET client for the XI Parallax REST API: image registration, look-up, published records and attribution verification.</Description>
@@ -24,5 +24,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Kiota.Bundle" />
     <PackageReference Include="Xio.Parallax.Common" />
+    <!-- embedded JUMBF detection and the manifest merge, composed once in C2paComposition -->
+    <PackageReference Include="Xio.Parallax.Manifests" />
   </ItemGroup>
 </Project>

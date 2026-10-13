@@ -1,27 +1,28 @@
 namespace Xio.Parallax.Client.Manifests.Services;
 
 /// <summary>
-/// Resolves manifest selections into manifest parts: JSON sidecars as given, JUMBF sidecars and
-/// embedded JUMBF manifest stores classified c2pa or jumbf by the JUMBF walk. A JUMBF sidecar that
-/// differs from an embedded store, a malformed store or sidecar, an unrecognised carrier whenever
-/// the embedded store matters, and two manifests of one kind are refusals; over a collection every
-/// image is evaluated first and any refusal refuses them all.
+/// Resolves manifest selections into manifest parts: JSON sidecars as given, JUMBF sidecars
+/// classified c2pa or jumbf by the JUMBF walk, and, when the selection includes them, the embedded
+/// JUMBF manifest stores merged in by Xio.Parallax.Manifests: every embedded store whose bytes are not
+/// already in the list is added, C2PA or not. A malformed sidecar or embedding, more than one distinct
+/// C2PA manifest, and two JSON manifests of one kind are refusals; over a collection every image is
+/// evaluated first and any refusal refuses them all.
 /// </summary>
 public sealed class ManifestResolver : IManifestResolver
 {
-    private readonly IEmbeddedC2paDetector _detector;
+    private readonly IManifestMerger _merger;
     private readonly IJumbfStoreReader _jumbf;
 
-    /// <summary>Creates the resolver over the built-in detector and JUMBF reader.</summary>
+    /// <summary>Creates the resolver over the manifest merge and JUMBF walk of Xio.Parallax.Manifests.</summary>
     public ManifestResolver()
-        : this(new EmbeddedC2paDetector(), C2paComposition.JumbfReader)
+        : this(C2paComposition.Merger, C2paComposition.JumbfReader)
     {
     }
 
-    internal ManifestResolver(IEmbeddedC2paDetector detector,
+    internal ManifestResolver(IManifestMerger merger,
                               IJumbfStoreReader jumbf)
     {
-        _detector = detector;
+        _merger = merger;
         _jumbf = jumbf;
     }
 
@@ -61,7 +62,6 @@ public sealed class ManifestResolver : IManifestResolver
         ArgumentNullException.ThrowIfNull(image);
         ArgumentNullException.ThrowIfNull(selection);
         var parts = new List<ManifestPart>();
-        var jumbfSidecars = new List<ReadOnlyMemory<byte>>();
         foreach (var sidecar in selection.Sidecars)
         {
             if (sidecar.Form == ManifestForm.Json)
@@ -76,36 +76,46 @@ public sealed class ManifestResolver : IManifestResolver
                 return Resolution.Refused($"JUMBF sidecar '{sidecar.Name}' is malformed: {failure}");
             }
 
-            if (jumbfSidecars.Any(included => included.Span.SequenceEqual(sidecar.Bytes.Span)))
+            if (!parts.Any(part => part.Form != ManifestForm.Json && part.Bytes.Span.SequenceEqual(sidecar.Bytes.Span)))
             {
-                continue;
+                parts.Add(new ManifestPart(kind, C2paAttachment.FormOf(kind), sidecar.Bytes));
             }
-
-            parts.Add(new ManifestPart(kind, C2paAttachment.FormOf(kind), sidecar.Bytes));
-            jumbfSidecars.Add(sidecar.Bytes);
         }
 
-        if (selection.IncludeEmbedded || jumbfSidecars.Count > 0)
+        if (selection.IncludeEmbedded)
         {
-            var embedded = _detector.Detect(image.Bytes);
-            var refusal = EmbeddedRefusal(embedded, selection.Sidecars, jumbfSidecars);
-            if (refusal is not null)
+            var merged = _merger.Merge(image.Bytes, [.. parts.Select(ToEntry)]);
+            switch (merged.Outcome)
             {
-                return Resolution.Refused(refusal);
-            }
-
-            if (selection.IncludeEmbedded)
-            {
-                parts.AddRange(embedded.Stores
-                    .Where(store => !jumbfSidecars.Any(sidecar => sidecar.Span.SequenceEqual(store.Bytes.Span)))
-                    .Select(C2paAttachment.AsManifestPart));
+                case ManifestMergeOutcome.Merged:
+                    parts = [.. merged.Manifests.Select(ToPart)];
+                    break;
+                case ManifestMergeOutcome.Conflict:
+                    return Resolution.Refused($"Its manifests conflict: {merged.Detail}");
+                case ManifestMergeOutcome.Malformed:
+                    return Resolution.Refused($"Its embedded JUMBF manifest store is malformed: {merged.Detail}");
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(image), merged.Outcome, "Unknown merge outcome; there is no default.");
             }
         }
 
-        var repeated = parts.GroupBy(part => part.Kind).FirstOrDefault(group => group.Count() > 1);
+        return Repeated(parts) is { } refusal ? Resolution.Refused(refusal) : new Resolution(parts, null);
+    }
+
+    private static string? Repeated(IReadOnlyList<ManifestPart> parts)
+    {
+        var c2pa = parts.Count(part => part.Kind == JumbfKinds.C2pa);
+        if (c2pa > 1)
+        {
+            return $"{c2pa} distinct C2PA manifests across its sidecars and embedded stores; an image carries at most one.";
+        }
+
+        var repeated = parts.Where(part => part.Form == ManifestForm.Json)
+            .GroupBy(part => part.Kind)
+            .FirstOrDefault(group => group.Count() > 1);
         return repeated is null
-            ? new Resolution(parts, null)
-            : Resolution.Refused($"{repeated.Count()} manifests of kind '{repeated.Key}' across its sidecars and embedded stores; one kind carries one manifest.");
+            ? null
+            : $"{repeated.Count()} JSON manifests of kind '{repeated.Key}'; one JSON kind carries one manifest.";
     }
 
     private string? ClassifySidecar(ReadOnlyMemory<byte> bytes, out string? failure)
@@ -116,43 +126,33 @@ public sealed class ManifestResolver : IManifestResolver
             failure = null;
             return _jumbf.Classify(bytes.Span);
         }
-        catch (C2paFormatException exception)
+        catch (JumbfFormatException exception)
         {
             failure = exception.Message;
             return null;
         }
     }
 
-    private static string? EmbeddedRefusal(EmbeddedC2paResult embedded, IReadOnlyList<SidecarManifest> sidecars, List<ReadOnlyMemory<byte>> jumbfSidecars)
+    private static ImageManifestEntry ToEntry(ManifestPart part)
     {
-        switch (embedded.Outcome)
+        var form = part.Form switch
         {
-            case EmbeddedC2paOutcome.Unsupported:
-                return $"Its carrier is not recognised, so whether it embeds a JUMBF manifest store cannot be said: {embedded.Detail}";
-            case EmbeddedC2paOutcome.Malformed:
-                return $"Its embedded JUMBF manifest store is malformed: {embedded.Detail}";
-            case EmbeddedC2paOutcome.Absent:
-                return null;
-            case EmbeddedC2paOutcome.Found:
-                if (jumbfSidecars.Count == 0)
-                {
-                    return null;
-                }
+            ManifestForm.Json => ManifestPayloadForm.Json,
+            ManifestForm.Jumbf or ManifestForm.C2pa => ManifestPayloadForm.Jumbf,
+            _ => throw new ArgumentOutOfRangeException(nameof(part), part.Form, "Unknown manifest form; there is no default."),
+        };
+        return new ImageManifestEntry(part.Kind, form, part.Bytes);
+    }
 
-                var unmatchedStore = embedded.Stores.FirstOrDefault(store => !jumbfSidecars.Any(sidecar => sidecar.Span.SequenceEqual(store.Bytes.Span)));
-                if (unmatchedStore is not null)
-                {
-                    return $"Its embedded {unmatchedStore.Kind} manifest store differs from its JUMBF sidecar(s); embedded stores and JUMBF sidecars must be the same bytes.";
-                }
-
-                var unmatchedSidecar = sidecars.FirstOrDefault(sidecar => sidecar.Form == ManifestForm.Jumbf
-                    && !embedded.Stores.Any(store => store.Bytes.Span.SequenceEqual(sidecar.Bytes.Span)));
-                return unmatchedSidecar is null
-                    ? null
-                    : $"Its JUMBF sidecar '{unmatchedSidecar.Name}' matches no embedded manifest store; embedded stores and JUMBF sidecars must be the same bytes.";
-            default:
-                throw new ArgumentOutOfRangeException(nameof(embedded), embedded.Outcome, "Unknown embedded outcome; there is no default.");
-        }
+    private static ManifestPart ToPart(ImageManifestEntry entry)
+    {
+        var form = entry.Form switch
+        {
+            ManifestPayloadForm.Json => ManifestForm.Json,
+            ManifestPayloadForm.Jumbf => C2paAttachment.FormOf(entry.Kind),
+            _ => throw new ArgumentOutOfRangeException(nameof(entry), entry.Form, "Unknown manifest payload form; there is no default."),
+        };
+        return new ManifestPart(entry.Kind, form, entry.Payload);
     }
 
     /// <summary>One image's resolution: its parts in wire order, or the one reason it was refused.</summary>
