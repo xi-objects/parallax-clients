@@ -3,7 +3,8 @@
 Client SDKs for the XI Parallax REST API (`https://api.parallax.xiobjects.com`), in .NET
 (`Xio.Parallax.Client`, .NET 10) and Python (`xio-parallax-client`, Python 3.11+). Each wraps
 registration, look-up, published records, attribution verification, embedded C2PA/JUMBF detection
-and video sequences behind typed calls and typed refusals.
+(in .NET, from the `Xio.Parallax.Manifests` package) and video sequences behind typed calls and
+typed refusals.
 
 For the full call catalogue, options and exception types, see
 [`src/Xio.Parallax.Client/README.md`](src/Xio.Parallax.Client/README.md) (.NET) and

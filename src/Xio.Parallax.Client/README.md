@@ -166,16 +166,14 @@ Trust roots (`TrustRoots`, never empty):
 
 The client, never the API, looks inside a file.
 
-`new EmbeddedC2paDetector().Detect(fileBytes)` recognises the carrier by signature (JPEG APP11 —
-possibly several box instances, reassembled in document order; PNG `caBX`; WebP `C2PA` chunk;
-classic TIFF/DNG tag `0xCD41` — each carrying at most one) and extracts and classifies every
-embedded JUMBF manifest store: the C2PA manifest-store UUID and label `c2pa` make it kind `c2pa`
-(sent as `application/c2pa`); any other well-formed store is kind `jumbf` (`application/jumbf`).
-Returns `EmbeddedC2paResult` (`Carrier`, `Outcome`, `Stores`, `Detail`); `Outcome` is `Found`,
-`Absent`, `Malformed` (a store the JUMBF walk refuses, or two stores of one kind) or `Unsupported`
-(an unrecognised carrier — nothing is said about its content).
+Detection, the JUMBF walk and the manifest merge come from the
+[`Xio.Parallax.Manifests`](https://www.nuget.org/packages/Xio.Parallax.Manifests) package.
+`services.AddXioParallaxManifests()` registers `IEmbeddedJumbfDetector`,
+`IJumbfStoreReader` and `IManifestMerger`; the package's README gives the carriers it reads (JPEG,
+PNG, WebP, TIFF/DNG, GIF, HEIF/HEIC/AVIF) and how each store is classified `c2pa` (sent as
+`application/c2pa`) or `jumbf` (`application/jumbf`). Any other format carries no embedded store.
 
-`C2paAttachment.AsManifestPart(store)` turns a detected store into a `ManifestPart` of its
+`C2paAttachment.AsManifestPart(store)` turns a detected `EmbeddedJumbfStore` into a `ManifestPart` of its
 classified kind and form, to attach explicitly.
 
 `C2paRecordComparer.Compare(store, record)` compares a detected store's BLAKE3-256 against the
@@ -191,13 +189,15 @@ its own bytes at resolution — `ManifestForm.C2pa` is a classification result, 
 sidecar form, and is refused at construction.
 
 `new ManifestResolver().Resolve(requests)` (a list of `ManifestRequest(Image, Selection)`) or
-`.Resolve(image, selection)` resolves every image's parts (sidecars first in given order, then
-embedded stores not already covered by a sidecar) before anything is sent. It refuses (naming
-every offending image, resolving nothing) when: an image carries an embedded store and a JUMBF
-sidecar is offered but the two are not byte-identical as sets; a store or sidecar is malformed; the
-carrier is unrecognised while the embedded store matters (`IncludeEmbedded`, or any JUMBF
-sidecar given); or two manifests share one kind. Inclusion is always the caller's own selection —
-the register calls send exactly what was resolved, never a client-side default.
+`.Resolve(image, selection)` resolves every image's parts (sidecars first in given order, then,
+with `IncludeEmbedded`, the embedded stores merged in by `IManifestMerger` in document order)
+before anything is sent. The merge adds every embedded JUMBF store, C2PA or not, unless its bytes
+are already in the list; distinct plain `jumbf` stores may repeat. It refuses (naming every
+offending image, resolving nothing) when: an image would carry more than one distinct C2PA
+manifest across its sidecars and embedded stores; its embedding or a JUMBF sidecar is malformed;
+or two JSON manifests share one kind. Without `IncludeEmbedded` the image's embedding is not read.
+Inclusion is always the caller's own selection � the register calls send exactly what was
+resolved, never a client-side default.
 
 ## Account-side inputs the integrator supplies
 
