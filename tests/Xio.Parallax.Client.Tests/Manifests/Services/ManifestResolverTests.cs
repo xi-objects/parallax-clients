@@ -42,21 +42,23 @@ public sealed class ManifestResolverTests
     }
 
     [Fact]
-    public void A_malformed_embedded_store_refuses_when_only_a_jumbf_sidecar_is_given()
+    public void Sidecars_alone_never_look_at_the_embedding()
     {
         var notJumb = TestCarriers.Box("json", Json);
 
-        var refusal = Refused(Image(TestCarriers.Png(("caBX", notJumb))), Sidecars(SidecarManifest.Jumbf("a.png.c2pa", TestCarriers.SyntheticStore())));
+        var part = Assert.Single(_resolver.Resolve(Image(TestCarriers.Png(("caBX", notJumb))), Sidecars(SidecarManifest.Jumbf("a.png.c2pa", TestCarriers.SyntheticStore()))));
 
-        Assert.Contains("malformed", refusal.Reason);
+        Assert.Equal(("c2pa", ManifestForm.C2pa), (part.Kind, part.Form));
     }
 
     [Fact]
-    public void An_unsupported_carrier_refuses_when_the_embedded_store_is_included()
+    public void An_image_whose_format_has_no_jumbf_embedding_keeps_its_sidecars()
     {
-        var refusal = Refused(Image(TestCarriers.Gif()), Embedded());
+        var sidecar = SidecarManifest.Json("a.bmp.json", "xi-manifest", Json);
 
-        Assert.Contains("not recognised", refusal.Reason);
+        var part = Assert.Single(_resolver.Resolve(Image("BM"u8.ToArray(), "a.bmp"), Embedded(sidecar)));
+
+        Assert.Equal("xi-manifest", part.Kind);
     }
 
     [Fact]
@@ -102,25 +104,46 @@ public sealed class ManifestResolverTests
     }
 
     [Fact]
-    public void A_jumbf_sidecar_differing_from_the_embedded_store_refuses()
+    public void An_embedded_plain_jumbf_store_is_added_beside_a_c2pa_sidecar()
     {
-        var image = Image(TestCarriers.Png(("caBX", TestCarriers.SyntheticStore())));
-        var sidecar = SidecarManifest.Jumbf("a.png.jumbf", TestCarriers.OtherStore(TestCarriers.ManifestUuid, "xi"));
+        var plain = TestCarriers.OtherStore(TestCarriers.ManifestUuid, "xi");
 
-        var refusal = Refused(image, Sidecars(sidecar));
+        var parts = _resolver.Resolve(Image(TestCarriers.Png(("caBX", plain))), Embedded(SidecarManifest.Jumbf("a.png.c2pa", TestCarriers.SyntheticStore())));
 
-        Assert.Contains("differs from its JUMBF sidecar", refusal.Reason);
+        Assert.Equal([("c2pa", ManifestForm.C2pa), ("jumbf", ManifestForm.Jumbf)], parts.Select(part => (part.Kind, part.Form)));
+        Assert.Equal(plain, parts[1].Bytes.ToArray());
     }
 
     [Fact]
-    public void A_jumbf_sidecar_matching_no_embedded_store_refuses_even_when_another_sidecar_matches()
+    public void Distinct_plain_jumbf_stores_are_all_included()
     {
-        var store = TestCarriers.SyntheticStore();
-        var selection = Sidecars(SidecarManifest.Jumbf("a.png.c2pa", store), SidecarManifest.Jumbf("a.png.jumbf", TestCarriers.OtherStore(TestCarriers.ManifestUuid, "xi")));
+        var first = TestCarriers.OtherStore(TestCarriers.ManifestUuid, "xi");
+        var second = TestCarriers.OtherStore(TestCarriers.ClaimUuid, "other");
+        var jpeg = TestCarriers.Jpeg([.. TestCarriers.App11Payloads(first, 5, 1), .. TestCarriers.App11Payloads(second, 6, 1)]);
 
-        var refusal = Refused(Image(TestCarriers.Png(("caBX", store))), selection);
+        var parts = _resolver.Resolve(Image(jpeg), Embedded(SidecarManifest.Jumbf("a.png.jumbf", first)));
 
-        Assert.Contains("'a.png.jumbf' matches no embedded manifest store", refusal.Reason);
+        Assert.Equal([first, second], parts.Select(part => part.Bytes.ToArray()));
+    }
+
+    [Fact]
+    public void A_second_distinct_c2pa_manifest_embedded_beside_a_c2pa_sidecar_is_a_conflict()
+    {
+        var image = Image(TestCarriers.Png(("caBX", TestCarriers.OtherStore(TestCarriers.StoreUuid, "c2pa"))));
+
+        var refusal = Refused(image, Embedded(SidecarManifest.Jumbf("a.png.c2pa", TestCarriers.SyntheticStore())));
+
+        Assert.Contains("conflict", refusal.Reason);
+    }
+
+    [Fact]
+    public void Two_distinct_c2pa_sidecars_refuse()
+    {
+        var selection = Sidecars(SidecarManifest.Jumbf("a.c2pa", TestCarriers.SyntheticStore()), SidecarManifest.Jumbf("b.c2pa", TestCarriers.OtherStore(TestCarriers.StoreUuid, "c2pa")));
+
+        var refusal = Refused(Image(TestCarriers.Png()), selection);
+
+        Assert.Contains("2 distinct C2PA manifests", refusal.Reason);
     }
 
     [Fact]
@@ -134,14 +157,6 @@ public sealed class ManifestResolverTests
     }
 
     [Fact]
-    public void A_jumbf_sidecar_beside_an_unsupported_carrier_refuses()
-    {
-        var refusal = Refused(Image(TestCarriers.Gif()), Sidecars(SidecarManifest.Jumbf("a.gif.c2pa", TestCarriers.SyntheticStore())));
-
-        Assert.Contains("not recognised", refusal.Reason);
-    }
-
-    [Fact]
     public void A_malformed_jumbf_sidecar_refuses_naming_it()
     {
         var refusal = Refused(Image(TestCarriers.Png()), Sidecars(SidecarManifest.Jumbf("a.png.jumbf", TestCarriers.Box("json", Json))));
@@ -150,13 +165,13 @@ public sealed class ManifestResolverTests
     }
 
     [Fact]
-    public void Two_manifests_of_one_kind_across_sidecars_and_embedded_stores_refuse()
+    public void Two_json_manifests_of_one_kind_refuse()
     {
-        var image = Image(TestCarriers.Png(("caBX", TestCarriers.SyntheticStore())));
+        var selection = Sidecars(SidecarManifest.Json("a.json", "xi-manifest", Json), SidecarManifest.Json("b.json", "xi-manifest", "{}"u8.ToArray()));
 
-        var refusal = Refused(image, Embedded(SidecarManifest.Json("a.png.json", "c2pa", Json)));
+        var refusal = Refused(Image(TestCarriers.Png()), selection);
 
-        Assert.Contains("2 manifests of kind 'c2pa'", refusal.Reason);
+        Assert.Contains("2 JSON manifests of kind 'xi-manifest'", refusal.Reason);
     }
 
     [Fact]
@@ -164,14 +179,14 @@ public sealed class ManifestResolverTests
     {
         ManifestRequest[] requests =
         [
-            new(Image(TestCarriers.Gif(), "first.gif"), Embedded()),
+            new(Image(TestCarriers.Png(("caBX", TestCarriers.SyntheticStore())), "first.png"), Embedded(SidecarManifest.Jumbf("first.c2pa", TestCarriers.OtherStore(TestCarriers.StoreUuid, "c2pa")))),
             new(Image(TestCarriers.Png(("caBX", TestCarriers.SyntheticStore())), "good.png"), Embedded()),
             new(Image(TestCarriers.Png(("caBX", TestCarriers.Box("json", Json))), "third.png"), Embedded()),
         ];
 
         var exception = Assert.Throws<ManifestRefusalException>(() => _resolver.Resolve(requests));
 
-        Assert.Equal(["first.gif", "third.png"], exception.Refusals.Select(refusal => refusal.FileName));
+        Assert.Equal(["first.png", "third.png"], exception.Refusals.Select(refusal => refusal.FileName));
         Assert.StartsWith("Manifest resolution refused 2 image(s):", exception.Message);
         Assert.Contains("\nthird.png: ", exception.Message);
     }

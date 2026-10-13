@@ -4,7 +4,7 @@ namespace Xio.Parallax.Client.C2pa.Services;
 public sealed class C2paRecordComparer : IC2paRecordComparer
 {
     /// <inheritdoc/>
-    public C2paComparison Compare(EmbeddedC2paStore store, PublishedRecordResponse record)
+    public C2paComparison Compare(EmbeddedJumbfStore store, PublishedRecordResponse record)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(record);

@@ -2,7 +2,7 @@ namespace Xio.Parallax.Client.Tests.C2pa.Support;
 
 /// <summary>
 /// Builds JUMBF stores and the carriers that embed them, byte for byte, from plain rules
-/// (big-endian box and PNG lengths, little-endian RIFF and TIFF, CRC-32 over PNG type and data),
+/// (big-endian box and PNG lengths, CRC-32 over PNG type and data),
 /// so the Python tests can build the same bytes.
 /// </summary>
 internal static class TestCarriers
@@ -99,29 +99,6 @@ internal static class TestCarriers
         return [.. file];
     }
 
-    /// <summary>A WebP: RIFF, its little-endian size, WEBP, a VP8L stub chunk and a C2PA chunk, each padded to an even length.</summary>
-    internal static byte[] WebP(byte[] c2paData)
-    {
-        List<byte> body = [.. "WEBP"u8.ToArray(), .. RiffChunk("VP8L", [0x2F, 0x00, 0x00, 0x00, 0x00]), .. RiffChunk("C2PA", c2paData)];
-        var size = new byte[4];
-        BinaryPrimitives.WriteUInt32LittleEndian(size, (uint)body.Count);
-        return [.. "RIFF"u8.ToArray(), .. size, .. body];
-    }
-
-    /// <summary>A little-endian TIFF whose single IFD holds tag 52545 (UNDEFINED) pointing at the data after the IFD.</summary>
-    internal static byte[] Tiff(byte[] c2paData)
-    {
-        var header = new byte[8 + 2 + 12 + 4];
-        "II*\0"u8.CopyTo(header);
-        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(4), 8);
-        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(8), 1);
-        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(10), 0xCD41);
-        BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(12), 7);
-        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(14), (uint)c2paData.Length);
-        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(18), (uint)header.Length);
-        return [.. header, .. c2paData];
-    }
-
     /// <summary>A GIF89a header and trailer.</summary>
     internal static byte[] Gif()
     {
@@ -146,14 +123,6 @@ internal static class TestCarriers
         typed.CopyTo(chunk, 4);
         BinaryPrimitives.WriteUInt32BigEndian(chunk.AsSpan(4 + typed.Length), Crc32(typed));
         return chunk;
-    }
-
-    private static byte[] RiffChunk(string fourCc, byte[] data)
-    {
-        var size = new byte[4];
-        BinaryPrimitives.WriteUInt32LittleEndian(size, (uint)data.Length);
-        byte[] padding = data.Length % 2 == 1 ? [0x00] : [];
-        return [.. Encoding.ASCII.GetBytes(fourCc), .. size, .. data, .. padding];
     }
 
     private static uint Crc32(byte[] bytes)
