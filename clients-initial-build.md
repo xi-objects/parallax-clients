@@ -426,8 +426,8 @@ examples/dotnet/GettingStarted/  examples/python/getting_started.py
   block. Supersedes in part "C2PA at the bytes level (ruled 2026-09-22)"'s "attach it only when
   the registrant says so".
 - **The manifest merge, one package (ruled 2026-10-13):** the .NET client's embedded detection,
-  JUMBF walk and merge are the `Xio.Parallax.Manifests` package (nuget.org), shared with the
-  Parallax edge; the client keeps no copy. With the embedded store(s) included, every embedded
+  JUMBF walk and merge are the `Xio.Parallax.Manifests` package (nuget.org); the client keeps no
+  copy. With the embedded store(s) included, every embedded
   JUMBF store, C2PA or not, is added to the image's manifests unless identical bytes are already
   there; distinct plain JUMBF stores may repeat; more than one distinct C2PA manifest on one image
   is a conflict and refuses; a malformed embedding refuses; a format with no JUMBF embedding
