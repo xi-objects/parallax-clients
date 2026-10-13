@@ -36,7 +36,6 @@ global using Org.BouncyCastle.Security;
 global using Org.BouncyCastle.X509;
 global using Xio.Parallax.Client.C2pa.Enums;
 global using Xio.Parallax.Client.C2pa.Interfaces;
-global using Xio.Parallax.Client.C2pa.Models;
 global using Xio.Parallax.Client.C2pa.Services;
 global using Xio.Parallax.Client.Generated.Models;
 global using Xio.Parallax.Client.Manifests.Models;
@@ -63,5 +62,8 @@ global using Xio.Parallax.Client.Verification.Models;
 global using Xio.Parallax.Client.Verification.Services;
 // PC-102: the PX frame types the encoder round-trip tests assert on
 global using Xio.Parallax.Common;
+// the embedded store type the record comparer takes, and the detector the fixture tests compose
+global using Xio.Parallax.Manifests;
+global using Xio.Parallax.Manifests.Embedded;
 global using Xunit;
 global using Blake3Hasher = Blake3.Hasher;

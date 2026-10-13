@@ -1,15 +1,11 @@
 namespace Xio.Parallax.Client.C2pa;
 
-/// <summary>The C2PA domain's wiring: each stateless service built once; the public entry points compose from here.</summary>
+/// <summary>The C2PA domain's wiring: embedded JUMBF detection, the JUMBF walk and the manifest merge, composed once from Xio.Parallax.Manifests.</summary>
 internal static class C2paComposition
 {
-    internal static readonly IJumbfStoreReader JumbfReader = new JumbfStoreReader();
+    private static readonly ServiceProvider Provider = new ServiceCollection().AddXioParallaxManifests().BuildServiceProvider();
 
-    internal static readonly IReadOnlyList<ICarrierReader> CarrierReaders =
-    [
-        new JpegCarrierReader(),
-        new PngCarrierReader(),
-        new WebPCarrierReader(),
-        new TiffCarrierReader(),
-    ];
+    internal static readonly IJumbfStoreReader JumbfReader = Provider.GetRequiredService<IJumbfStoreReader>();
+
+    internal static readonly IManifestMerger Merger = Provider.GetRequiredService<IManifestMerger>();
 }

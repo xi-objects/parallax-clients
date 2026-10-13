@@ -95,7 +95,7 @@ public sealed record SidecarManifest(string Name,
 }
 
 /// <summary>Which manifests an image is registered with: its embedded JUMBF manifest store(s) or not, and its sidecars.</summary>
-/// <param name="IncludeEmbedded">True to include every embedded JUMBF manifest store, each under its classified kind.</param>
+/// <param name="IncludeEmbedded">True to merge in every embedded JUMBF manifest store, each under its classified kind, unless its bytes are already among the sidecars.</param>
 /// <param name="Sidecars">The sidecars, sent first on the wire in this order.</param>
 public sealed record ManifestSelection(bool IncludeEmbedded,
                                        IReadOnlyList<SidecarManifest> Sidecars)

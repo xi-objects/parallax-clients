@@ -6,7 +6,7 @@ public static class C2paAttachment
     /// <summary>Returns the store as the manifest part manifest[&lt;kind&gt;] of its classified kind, carrying the store bytes unchanged.</summary>
     /// <param name="store">The store detection returned.</param>
     /// <returns>A <see cref="ManifestPart"/> of kind c2pa and form <see cref="ManifestForm.C2pa"/>, or of kind jumbf and form <see cref="ManifestForm.Jumbf"/>.</returns>
-    public static ManifestPart AsManifestPart(EmbeddedC2paStore store)
+    public static ManifestPart AsManifestPart(EmbeddedJumbfStore store)
     {
         ArgumentNullException.ThrowIfNull(store);
         return new ManifestPart(store.Kind, FormOf(store.Kind), store.Bytes);
@@ -19,8 +19,8 @@ public static class C2paAttachment
     {
         return kind switch
         {
-            C2paConstants.C2paKind => ManifestForm.C2pa,
-            C2paConstants.JumbfKind => ManifestForm.Jumbf,
+            JumbfKinds.C2pa => ManifestForm.C2pa,
+            JumbfKinds.Jumbf => ManifestForm.Jumbf,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a classified JUMBF manifest kind; there is no default form."),
         };
     }
