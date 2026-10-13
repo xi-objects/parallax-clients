@@ -425,6 +425,16 @@ examples/dotnet/GettingStarted/  examples/python/getting_started.py
   manifests of one kind on one image refuse. A JSON sidecar never conflicts with an embedded
   block. Supersedes in part "C2PA at the bytes level (ruled 2026-09-22)"'s "attach it only when
   the registrant says so".
+- **The manifest merge, one package (ruled 2026-10-13):** the .NET client's embedded detection,
+  JUMBF walk and merge are the `Xio.Parallax.Manifests` package (nuget.org), shared with the
+  Parallax edge; the client keeps no copy. With the embedded store(s) included, every embedded
+  JUMBF store, C2PA or not, is added to the image's manifests unless identical bytes are already
+  there; distinct plain JUMBF stores may repeat; more than one distinct C2PA manifest on one image
+  is a conflict and refuses; a malformed embedding refuses; a format with no JUMBF embedding
+  carries no store. Without them the embedding is not read. Supersedes, for .NET, "The conflict
+  rule (ruled 2026-09-26)" and the "two of the same kind refuse" of "Several JUMBF instances per
+  JPEG"; two JSON manifests of one kind still refuse. The Python client keeps its own detection
+  under the 2026-09-26 rules.
 - **Whole-collection resolution (ruled 2026-09-26):** resolution runs over every item of a
   collection before anything is sent; any refusal refuses the whole collection with every
   offending item listed, and nothing is returned partially.

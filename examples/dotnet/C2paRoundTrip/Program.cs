@@ -5,17 +5,19 @@
 // Environment:
 //   PARALLAX_BASE_URL          the API's base URL (defaults to https://api.parallax.xiobjects.com)
 //   PARALLAX_TOKEN             the account token (required)
-//   PARALLAX_IMAGE             path of the image (required); JPEG, PNG, WebP or TIFF carriers
+//   PARALLAX_IMAGE             path of the image (required); JPEG, PNG, WebP, TIFF, GIF or HEIF/HEIC/AVIF carriers
 //   PARALLAX_IMAGE_TYPE        its media type (required)
-//   PARALLAX_INCLUDE_EMBEDDED  "yes" to include the embedded store(s), each as manifest[<kind>];
+//   PARALLAX_INCLUDE_EMBEDDED  "yes" to merge in the embedded store(s), each as manifest[<kind>];
 //                              anything else registers without them (the registrant decides, never the client)
 //
 // Run from the repository root: dotnet run --project examples/dotnet/C2paRoundTrip
 
 var image = ImageUpload.FromFile(Required("PARALLAX_IMAGE"), Required("PARALLAX_IMAGE_TYPE"));
-var detector = new EmbeddedC2paDetector();
+// Detection and the manifest merge come from Xio.Parallax.Manifests, composed once here.
+using var manifestServices = new ServiceCollection().AddXioParallaxManifests().BuildServiceProvider();
+var detector = manifestServices.GetRequiredService<IEmbeddedJumbfDetector>();
 var detected = detector.Detect(image.Bytes);
-if (detected.Outcome != EmbeddedC2paOutcome.Found)
+if (detected.Outcome != EmbeddedJumbfOutcome.Found)
 {
     Console.Error.WriteLine($"{detected.Carrier}: {detected.Outcome} ({detected.Detail})");
     return 1;
@@ -52,7 +54,7 @@ Console.WriteLine($"record outcome: {record.Outcome}");
 
 // The finder's side: the same detection on the file that was found, each store compared with the record.
 var found = detector.Detect(image.Bytes);
-if (found.Outcome != EmbeddedC2paOutcome.Found)
+if (found.Outcome != EmbeddedJumbfOutcome.Found)
 {
     Console.Error.WriteLine($"the found file carries no store to compare ({found.Outcome}: {found.Detail})");
     return 1;
